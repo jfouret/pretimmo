@@ -138,7 +138,7 @@ const Events = (() => {
     MortgageSimulator.setTotalCost(totalCost);
     
     // Use optimized TAEG calculation with optimization-js
-    const taeg = MortgageSimulator.Formulas.calcTAEGOptimized(
+    const taeg = MortgageSimulator.Formulas.calcTAEG(
       requiredLoanResult.loan,
       monthlyPaymentWithInsurance, // Total monthly payment including insurance
       state.duration,

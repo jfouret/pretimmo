@@ -658,58 +658,6 @@ MortgageSimulator.Formulas = (() => {
   // 10. TAEG CALCULATION (ITERATIVE IRR)
   // ============================================
 
-  /**
-   * Calculate TAEG (Taux Annuel Effectif Global)
-   * Uses iterative approximation to find the effective annual rate
-   * TAEG reflects true cost including all fees
-   * @param {number} loan - Net loan amount received
-   * @param {number} totalCost - Total amount to be repaid (including all fees)
-   * @param {number} durationYears - Loan duration in years
-   * @returns {number} TAEG as percentage
-   */
-  const calcTAEG = (loan, totalCost, durationYears) => {
-    if (!loan || loan <= 0 || !totalCost || totalCost <= loan || !durationYears) {
-      return 0;
-    }
-    
-    const taegConfig = FormulaConstants.taeg;
-    const numMonths = durationYears * 12;
-    const monthlyPayment = totalCost / numMonths;
-    
-    // Newton-Raphson method to find monthly rate
-    var rate = taegConfig.initialGuess;
-    var iterations = 0;
-    
-    while (iterations < taegConfig.maxIterations) {
-      // Calculate present value at current rate
-      const pv = monthlyPayment * (1 - Math.pow(1 + rate, -numMonths)) / rate;
-      const diff = pv - loan;
-      
-      if (Math.abs(diff) < taegConfig.tolerance) {
-        break;
-      }
-      
-      // Calculate derivative for Newton-Raphson
-      const dpv = monthlyPayment * (
-        (1 - Math.pow(1 + rate, -numMonths)) / (rate * rate) -
-        numMonths * Math.pow(1 + rate, -numMonths - 1) / rate
-      );
-      
-      // Update rate
-      rate = rate - diff / dpv;
-      
-      // Prevent negative or extreme rates
-      if (rate < taegConfig.minRate) rate = taegConfig.minRate;
-      if (rate > taegConfig.maxRate) rate = taegConfig.maxRate;
-      
-      iterations++;
-    }
-    
-    // Convert monthly rate to annual TAEG
-    const taeg = rate * 12 * 100;
-    
-    return taeg;
-  };
 
   /**
    * Calculate TAEG using optimization-js (Powell's method)
@@ -723,17 +671,10 @@ MortgageSimulator.Formulas = (() => {
    * @param {number} insuranceRate - Annual insurance rate as decimal
    * @returns {number} TAEG as percentage
    */
-  const calcTAEGOptimized = (loan, monthlyPayment, durationYears, nominalRate, insuranceRate) => {
+  const calcTAEG = (loan, monthlyPayment, durationYears, nominalRate, insuranceRate) => {
     // Validate inputs
     if (!loan || loan <= 0 || !monthlyPayment || monthlyPayment <= 0 || !durationYears) {
       return 0;
-    }
-    
-    // Check if optimization-js is available
-    if (typeof optimjs === 'undefined' || !optimjs.minimize_Powell) {
-      // Fallback to iterative method
-      const totalCost = monthlyPayment * durationYears * 12;
-      return calcTAEG(loan, totalCost, durationYears);
     }
     
     const numMonths = durationYears * 12;
@@ -797,9 +738,6 @@ MortgageSimulator.Formulas = (() => {
       return optimizedTAEG;
     } catch (error) {
       console.error('TAEG optimization failed:', error);
-      // Fallback to iterative method
-      const totalCost = monthlyPayment * durationYears * 12;
-      return calcTAEG(loan, totalCost, durationYears);
     }
   };
 
@@ -836,7 +774,6 @@ MortgageSimulator.Formulas = (() => {
     // Amortization & TAEG
     generateAmortizationTable,
     calcTAEG,
-    calcTAEGOptimized,
   };
 })();
 
