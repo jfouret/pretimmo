@@ -377,6 +377,160 @@ MortgageSimulator.Formulas = (() => {
     };
   };
 
+  /**
+   * Optimize maximum property price considering insurance costs
+   * Uses binary search iteration to find the maximum affordable price where:
+   * - Total monthly payment (loan + insurance) fits within available budget
+   * - The circular dependency between insurance and loan is resolved
+   * 
+   * @param {number} capital - Available capital
+   * @param {number} maxMonthlyPayment - Maximum monthly payment budget (from 35% rule)
+   * @param {number} fraisDossier - Frais de dossier
+   * @param {string} propertyType - 'old' or 'new'
+   * @param {number} annualRate - Annual interest rate as percentage
+   * @param {number} durationYears - Loan duration in years
+   * @param {number} age - Borrower age (for insurance calculation)
+   * @returns {Object} {price, notaryFees, caution, totalFees, loan, monthlyPayment, monthlyInsurance}
+   */
+  const optimizeMaxPropertyPriceWithInsurance = (
+    capital,
+    maxMonthlyPayment,
+    fraisDossier,
+    propertyType,
+    annualRate,
+    durationYears,
+    age
+  ) => {
+    // Validate inputs
+    if (!capital || capital < 0 || !maxMonthlyPayment || maxMonthlyPayment <= 0) {
+      return { 
+        price: 0, 
+        notaryFees: 0, 
+        caution: 0, 
+        totalFees: 0, 
+        loan: 0,
+        monthlyPayment: 0,
+        monthlyInsurance: 0
+      };
+    }
+    
+    // Get insurance rate for age
+    const insuranceRate = getInsuranceRate(age);
+    
+    // Calculate initial max loan WITHOUT insurance consideration
+    const initialMaxLoan = calcMaxLoan(maxMonthlyPayment, annualRate, durationYears);
+    
+    // Calculate initial max price WITHOUT insurance consideration
+    const initialMaxPriceResult = calcMaxPropertyPrice(
+      capital,
+      initialMaxLoan,
+      fraisDossier,
+      propertyType
+    );
+    
+    // If no valid starting price, return zeros
+    if (initialMaxPriceResult.price <= 0) {
+      return {
+        price: 0,
+        notaryFees: 0,
+        caution: 0,
+        totalFees: 0,
+        loan: 0,
+        monthlyPayment: 0,
+        monthlyInsurance: 0
+      };
+    }
+    
+    /**
+     * Helper function: Check if a property price is affordable (within budget)
+     * @param {number} candidatePrice - Property price to test
+     * @returns {Object} {affordable: boolean, totalMonthlyCost: number, shortfall: number}
+     */
+    const checkAffordability = (candidatePrice) => {
+      // Calculate required loan for this price
+      const loanResult = calcRequiredLoan(candidatePrice, capital, fraisDossier, propertyType);
+      const requiredLoan = loanResult.loan;
+      
+      // If no loan needed, it's definitely affordable
+      if (requiredLoan <= 0) {
+        return { affordable: true, totalMonthlyCost: 0, shortfall: -maxMonthlyPayment };
+      }
+      
+      // Calculate monthly loan payment
+      const monthlyLoanPayment = calcMonthlyPayment(requiredLoan, annualRate, durationYears);
+      
+      // Calculate monthly insurance
+      const monthlyInsurance = calcMonthlyInsurance(requiredLoan, insuranceRate);
+      
+      // Total monthly cost
+      const totalMonthlyCost = monthlyLoanPayment + monthlyInsurance;
+      
+      // Calculate shortfall
+      const shortfall = totalMonthlyCost - maxMonthlyPayment;
+      
+      return {
+        affordable: shortfall <= 0,
+        totalMonthlyCost: totalMonthlyCost,
+        shortfall: shortfall,
+        loan: requiredLoan,
+        loanResult: loanResult
+      };
+    };
+    
+    // Binary search for optimal price
+    var minPrice = 0;
+    var maxPrice = initialMaxPriceResult.price;
+    var optimalPrice = minPrice;
+    const tolerance = 100; // €100 tolerance
+    const maxIterations = 30;
+    var iterations = 0;
+    
+    // Binary search iteration
+    while (maxPrice - minPrice > tolerance && iterations < maxIterations) {
+      const midPrice = (minPrice + maxPrice) / 2;
+      const check = checkAffordability(midPrice);
+      
+      if (check.affordable) {
+        // This price is affordable, try higher
+        optimalPrice = midPrice;
+        minPrice = midPrice;
+      } else {
+        // This price is too expensive, try lower
+        maxPrice = midPrice;
+      }
+      
+      iterations++;
+    }
+    
+    // Final check at optimal price
+    const finalCheck = checkAffordability(optimalPrice);
+    
+    // If we found an affordable price, return details
+    if (optimalPrice > 0 && finalCheck.loanResult) {
+      const finalLoan = finalCheck.loanResult.loan;
+      return {
+        price: optimalPrice,
+        notaryFees: finalCheck.loanResult.notaryFees,
+        caution: finalCheck.loanResult.caution,
+        totalFees: finalCheck.loanResult.totalFees,
+        loan: finalLoan,
+        monthlyPayment: calcMonthlyPayment(finalLoan, annualRate, durationYears),
+        monthlyInsurance: calcMonthlyInsurance(finalLoan, insuranceRate)
+      };
+    }
+    
+    // Fallback: return zeros if no solution found
+    return {
+      price: 0,
+      notaryFees: 0,
+      caution: 0,
+      totalFees: 0,
+      loan: 0,
+      monthlyPayment: 0,
+      monthlyInsurance: 0
+    };
+  };
+
   // ============================================
   // 8. REQUIRED LOAN FOR SELECTED PRICE
   // ============================================
@@ -557,6 +711,98 @@ MortgageSimulator.Formulas = (() => {
     return taeg;
   };
 
+  /**
+   * Calculate TAEG using optimization-js (Powell's method)
+   * Finds the true effective annual rate by minimizing the difference between
+   * the actual monthly payment and the theoretical payment at a candidate TAEG
+   * 
+   * @param {number} loan - Net loan amount received
+   * @param {number} monthlyPayment - Actual monthly payment (principal + interest + insurance)
+   * @param {number} durationYears - Loan duration in years
+   * @param {number} nominalRate - Nominal interest rate as percentage (starting estimate)
+   * @param {number} insuranceRate - Annual insurance rate as decimal
+   * @returns {number} TAEG as percentage
+   */
+  const calcTAEGOptimized = (loan, monthlyPayment, durationYears, nominalRate, insuranceRate) => {
+    // Validate inputs
+    if (!loan || loan <= 0 || !monthlyPayment || monthlyPayment <= 0 || !durationYears) {
+      return 0;
+    }
+    
+    // Check if optimization-js is available
+    if (typeof optimjs === 'undefined' || !optimjs.minimize_Powell) {
+      // Fallback to iterative method
+      const totalCost = monthlyPayment * durationYears * 12;
+      return calcTAEG(loan, totalCost, durationYears);
+    }
+    
+    const numMonths = durationYears * 12;
+    
+    /**
+     * Objective function: Calculate absolute difference between
+     * theoretical monthly payment at candidate TAEG and actual monthly payment
+     * @param {Array} x - Array containing [candidateTAEGAnnual]
+     * @returns {number} Absolute difference (to minimize)
+     */
+    const objectiveFunction = (x) => {
+      const candidateTAEGAnnual = x[0]; // Annual rate as percentage
+      
+      // Prevent negative or unreasonable rates
+      if (candidateTAEGAnnual < 0 || candidateTAEGAnnual > 50) {
+        return 1e10; // Large penalty
+      }
+      
+      // Convert to monthly rate
+      const monthlyRateCandidate = candidateTAEGAnnual / 12 / 100;
+      
+      // Handle zero rate edge case
+      if (monthlyRateCandidate === 0) {
+        const theoreticalPayment = loan / numMonths;
+        return Math.abs(theoreticalPayment - monthlyPayment);
+      }
+      
+      // Calculate theoretical monthly payment at this TAEG
+      const theoreticalPayment = loan * 
+        (monthlyRateCandidate * Math.pow(1 + monthlyRateCandidate, numMonths)) / 
+        (Math.pow(1 + monthlyRateCandidate, numMonths) - 1);
+      
+      // Return absolute difference
+      return Math.abs(theoreticalPayment - monthlyPayment);
+    };
+    
+    // Starting value: nominal rate + estimated insurance contribution
+    // Insurance typically adds 0.3-0.5% to the annual rate
+    const estimatedInsuranceContribution = insuranceRate ? (insuranceRate * 100 * 0.5) : 0.3;
+    const startingValue = nominalRate + estimatedInsuranceContribution;
+    
+    try {
+      // Run Powell's optimization
+      const solution = optimjs.minimize_Powell(objectiveFunction, [startingValue]);
+      
+      // Extract optimized TAEG
+      let optimizedTAEG = solution.argument[0];
+      
+      // Constraint: TAEG must be >= nominal rate (insurance adds cost)
+      if (optimizedTAEG < nominalRate) {
+        optimizedTAEG = nominalRate;
+      }
+      
+      // Sanity check: reasonable range
+      if (optimizedTAEG < 0 || optimizedTAEG > 50) {
+        // Fallback to iterative method
+        const totalCost = monthlyPayment * durationYears * 12;
+        return calcTAEG(loan, totalCost, durationYears);
+      }
+      
+      return optimizedTAEG;
+    } catch (error) {
+      console.error('TAEG optimization failed:', error);
+      // Fallback to iterative method
+      const totalCost = monthlyPayment * durationYears * 12;
+      return calcTAEG(loan, totalCost, durationYears);
+    }
+  };
+
   // ============================================
   // PUBLIC API
   // ============================================
@@ -584,11 +830,13 @@ MortgageSimulator.Formulas = (() => {
     
     // Property Price
     calcMaxPropertyPrice,
+    optimizeMaxPropertyPriceWithInsurance,
     calcRequiredLoan,
     
     // Amortization & TAEG
     generateAmortizationTable,
     calcTAEG,
+    calcTAEGOptimized,
   };
 })();
 

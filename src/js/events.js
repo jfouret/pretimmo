@@ -47,7 +47,7 @@ const Events = (() => {
     // 2. Get interpolated interest rate for current duration
     const currentRate = MortgageSimulator.Formulas.interpolateRate(state.duration, state.rates);
     
-    // 3. Calculate maximum loan capacity
+    // 3. Calculate maximum loan capacity (without insurance consideration)
     const maxLoan = MortgageSimulator.Formulas.calcMaxLoan(
       maxMonthlyPayment,
       currentRate,
@@ -55,14 +55,49 @@ const Events = (() => {
     );
     MortgageSimulator.setMaxLoan(maxLoan);
     
-    // 4. Calculate maximum property price (iterative)
-    const maxPriceResult = MortgageSimulator.Formulas.calcMaxPropertyPrice(
+    // 4. Calculate maximum property price WITH INSURANCE OPTIMIZATION
+    // This uses the new optimization function that accounts for insurance in the circular dependency
+    const ages = state.ages;
+    const age = ages.person1 || 0;
+    
+    const optimizedMaxPriceResult = MortgageSimulator.Formulas.optimizeMaxPropertyPriceWithInsurance(
       state.capital,
-      maxLoan,
+      maxMonthlyPayment,
       state.fraisDossier,
-      state.propertyType
+      state.propertyType,
+      currentRate,
+      state.duration,
+      age
     );
-    MortgageSimulator.setMaxPropertyPrice(maxPriceResult.price);
+    
+    // Use the optimized max property price
+    MortgageSimulator.setMaxPropertyPrice(optimizedMaxPriceResult.price);
+    
+    // Update property price slider max to optimized max + 10%
+    const sliderMaxPrice = Math.round(optimizedMaxPriceResult.price * 1.10);
+    const propertyPriceSlider = document.getElementById('property-price-slider');
+    if (propertyPriceSlider) {
+      propertyPriceSlider.max = sliderMaxPrice;
+      
+      // If current property price exceeds new max, adjust it
+      if (state.propertyPrice > sliderMaxPrice) {
+        MortgageSimulator.setPropertyPrice(sliderMaxPrice);
+        propertyPriceSlider.value = sliderMaxPrice;
+        
+        const display = document.getElementById('property-price-display');
+        if (display) {
+          display.textContent = UI.formatNumber(sliderMaxPrice);
+        }
+        
+        UI.syncInput('property-price-input', sliderMaxPrice);
+      }
+    }
+    
+    // Update property price input max as well
+    const propertyPriceInput = document.getElementById('property-price-input');
+    if (propertyPriceInput) {
+      propertyPriceInput.max = sliderMaxPrice;
+    }
     
     // 5. Calculate required loan for selected property price
     const requiredLoanResult = MortgageSimulator.Formulas.calcRequiredLoan(
@@ -86,7 +121,6 @@ const Events = (() => {
     MortgageSimulator.setMonthlyPayment(monthlyPayment);
     
     // 7. Calculate insurance
-    const ages = state.ages;
     let insuranceRate = 0;
     if (ages.person1) {
       insuranceRate = MortgageSimulator.Formulas.getInsuranceRate(ages.person1);
@@ -103,10 +137,13 @@ const Events = (() => {
     const totalCost = (monthlyPayment + monthlyInsurance) * state.duration * 12;
     MortgageSimulator.setTotalCost(totalCost);
     
-    const taeg = MortgageSimulator.Formulas.calcTAEG(
+    // Use optimized TAEG calculation with optimization-js
+    const taeg = MortgageSimulator.Formulas.calcTAEGOptimized(
       requiredLoanResult.loan,
-      totalCost,
-      state.duration
+      monthlyPaymentWithInsurance, // Total monthly payment including insurance
+      state.duration,
+      currentRate, // Nominal rate
+      insuranceRate // Insurance rate
     );
     MortgageSimulator.setTaeg(taeg);
     
@@ -122,14 +159,15 @@ const Events = (() => {
     // 10. Update UI - Summary
     const debtRatio = monthlyIncome > 0 ? (monthlyPaymentWithInsurance / monthlyIncome) * 100 : 0;
     UI.renderSummary({
-      maxBudget: maxPriceResult.price,
-      maxPropertyPrice: maxPriceResult.price,
+      maxBudget: optimizedMaxPriceResult.price,
+      maxPropertyPrice: optimizedMaxPriceResult.price,
       propertyPrice: state.propertyPrice,
       loanAmount: requiredLoanResult.loan,
       requiredLoan: requiredLoanResult.loan,
       monthlyPayment: monthlyPayment,
       monthlyPaymentWithInsurance: monthlyPaymentWithInsurance,
       totalCost: totalCost,
+      taeg: taeg,
       debtRatio: debtRatio,
       notaryFees: requiredLoanResult.notaryFees || 0,
       cautionFees: requiredLoanResult.caution || 0,

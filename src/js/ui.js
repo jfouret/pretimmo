@@ -305,6 +305,12 @@ const UI = (() => {
       totalCostEl.textContent = formatCurrency(data.totalCost);
     }
 
+    // TAEG
+    const taegEl = document.getElementById('summary-taeg');
+    if (taegEl) {
+      taegEl.textContent = formatPercent(data.taeg || 0);
+    }
+
     // Notary fees
     const notaryFeesEl = document.getElementById('summary-notary-fees');
     if (notaryFeesEl) {
