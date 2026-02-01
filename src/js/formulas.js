@@ -1047,6 +1047,132 @@ MortgageSimulator.Formulas = (() => {
     };
   };
 
+  /**
+   * Optimize maximum property price with Gigogne and Insurance
+   * @param {Object} params - All parameters needed
+   * @returns {Object} Result object
+   */
+  const optimizeMaxPropertyPriceWithGigogne = (
+    capital,
+    maxMonthlyPayment,
+    fraisDossier,
+    propertyType,
+    r1,
+    n1,
+    r2,
+    n2,
+    maxP2,
+    age
+  ) => {
+    // Validate inputs
+    if (!capital || capital < 0 || !maxMonthlyPayment || maxMonthlyPayment <= 0) {
+      return { 
+        price: 0, notaryFees: 0, caution: 0, totalFees: 0, 
+        loan: 0, monthlyPayment: 0, monthlyInsurance: 0 
+      };
+    }
+    
+    const insuranceRate = getInsuranceRate(age);
+    
+    // 1. Calculate initial max loan (ignoring insurance for now to get upper bound)
+    // We use calcMaxLoanWithGigogne to get the max loan capacity given the monthly payment budget
+    const maxLoanResult = calcMaxLoanWithGigogne(maxMonthlyPayment, r1, n1, r2, n2, maxP2);
+    const initialMaxLoan = maxLoanResult.totalLoan;
+    
+    // 2. Calculate initial max price
+    const initialMaxPriceResult = calcMaxPropertyPrice(
+      capital,
+      initialMaxLoan,
+      fraisDossier,
+      propertyType
+    );
+    
+    if (initialMaxPriceResult.price <= 0) {
+      return { 
+        price: 0, notaryFees: 0, caution: 0, totalFees: 0, 
+        loan: 0, monthlyPayment: 0, monthlyInsurance: 0 
+      };
+    }
+    
+    // 3. Binary search for affordability
+    const checkAffordability = (candidatePrice) => {
+      // Calculate required loan
+      const loanResult = calcRequiredLoan(candidatePrice, capital, fraisDossier, propertyType);
+      const requiredLoan = loanResult.loan;
+      
+      if (requiredLoan <= 0) {
+        return { affordable: true, totalMonthlyCost: 0, shortfall: -maxMonthlyPayment };
+      }
+      
+      // Calculate optimal split for this required loan
+      const optimalP2 = calcOptimalSecondaryAmount(requiredLoan, r1, n1, r2, n2, maxP2);
+      const p1 = requiredLoan - optimalP2;
+      
+      // Calculate smooth monthly payment
+      const monthlyLoanPayment = calcSmoothMensuality(p1, r1, n1, optimalP2, r2, n2);
+      
+      // Calculate insurance
+      const monthlyInsurance = calcMonthlyInsurance(requiredLoan, insuranceRate);
+      
+      const totalMonthlyCost = monthlyLoanPayment + monthlyInsurance;
+      const shortfall = totalMonthlyCost - maxMonthlyPayment;
+      
+      return {
+        affordable: shortfall <= 0,
+        totalMonthlyCost,
+        shortfall,
+        loan: requiredLoan,
+        loanResult,
+        p1,
+        p2: optimalP2
+      };
+    };
+    
+    // Binary search
+    let minPrice = 0;
+    let maxPrice = initialMaxPriceResult.price;
+    let optimalPrice = 0;
+    const tolerance = 100;
+    const maxIterations = 30;
+    let iterations = 0;
+    
+    while (maxPrice - minPrice > tolerance && iterations < maxIterations) {
+      const midPrice = (minPrice + maxPrice) / 2;
+      const check = checkAffordability(midPrice);
+      
+      if (check.affordable) {
+        optimalPrice = midPrice;
+        minPrice = midPrice;
+      } else {
+        maxPrice = midPrice;
+      }
+      iterations++;
+    }
+    
+    // Final check
+    const finalCheck = checkAffordability(optimalPrice);
+    
+    if (optimalPrice > 0 && finalCheck.loanResult) {
+      return {
+        price: optimalPrice,
+        notaryFees: finalCheck.loanResult.notaryFees,
+        caution: finalCheck.loanResult.caution,
+        totalFees: finalCheck.loanResult.totalFees,
+        loan: finalCheck.loan,
+        monthlyPayment: finalCheck.totalMonthlyCost - calcMonthlyInsurance(finalCheck.loan, insuranceRate),
+        monthlyInsurance: calcMonthlyInsurance(finalCheck.loan, insuranceRate),
+        // Extra info
+        p1: finalCheck.p1,
+        p2: finalCheck.p2
+      };
+    }
+    
+    return { 
+      price: 0, notaryFees: 0, caution: 0, totalFees: 0, 
+      loan: 0, monthlyPayment: 0, monthlyInsurance: 0 
+    };
+  };
+
   // ============================================
   // PUBLIC API
   // ============================================
@@ -1085,7 +1211,8 @@ MortgageSimulator.Formulas = (() => {
     calcSmoothMensuality,
     calcOptimalSecondaryAmount,
     generateGigogneAmortizationTable,
-    calcMaxLoanWithGigogne
+    calcMaxLoanWithGigogne,
+    optimizeMaxPropertyPriceWithGigogne
   };
 })();
 

@@ -72,16 +72,34 @@ const Events = (() => {
     // This uses the new optimization function that accounts for insurance in the circular dependency
     const ages = state.ages;
     const age = ages.person1 || 0;
+    const gigogne = MortgageSimulator.getGigogne();
     
-    const optimizedMaxPriceResult = MortgageSimulator.Formulas.optimizeMaxPropertyPriceWithInsurance(
-      state.capital,
-      maxMonthlyPayment,
-      state.fraisDossier,
-      state.propertyType,
-      currentRate,
-      state.duration,
-      age
-    );
+    let optimizedMaxPriceResult;
+
+    if (gigogne.enabled) {
+      optimizedMaxPriceResult = MortgageSimulator.Formulas.optimizeMaxPropertyPriceWithGigogne(
+        state.capital,
+        maxMonthlyPayment,
+        state.fraisDossier,
+        state.propertyType,
+        currentRate,
+        state.duration,
+        gigogne.rate,
+        gigogne.duration,
+        gigogne.maxAmount,
+        age
+      );
+    } else {
+      optimizedMaxPriceResult = MortgageSimulator.Formulas.optimizeMaxPropertyPriceWithInsurance(
+        state.capital,
+        maxMonthlyPayment,
+        state.fraisDossier,
+        state.propertyType,
+        currentRate,
+        state.duration,
+        age
+      );
+    }
     
     // Use the optimized max property price
     MortgageSimulator.setMaxPropertyPrice(optimizedMaxPriceResult.price);
@@ -126,7 +144,6 @@ const Events = (() => {
     MortgageSimulator.setCautionFees(requiredLoanResult.caution || 0);
     
     // GIGOGNE LOGIC START
-    const gigogne = MortgageSimulator.getGigogne();
     let monthlyPayment, monthlyInsurance, monthlyPaymentWithInsurance, totalCost, taeg, amortizationTable;
     let insuranceRate = 0;
     if (state.ages.person1) {

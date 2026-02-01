@@ -452,6 +452,7 @@ const UI = (() => {
     const Charts = MortgageSimulator.Charts;
     const state = MortgageSimulator.getState();
     const computed = MortgageSimulator.getComputed();
+    const gigogne = MortgageSimulator.getGigogne();
 
     if (!computed || !computed.totalCost) {
       return;
@@ -465,7 +466,9 @@ const UI = (() => {
     Charts.renderDonut({
       principal: computed.requiredLoan || 0,
       interest: totalInterest,
-      insurance: totalInsurance
+      insurance: totalInsurance,
+      gigogne: gigogne.enabled,
+      amortization: computed.amortizationTable
     });
   };
 
