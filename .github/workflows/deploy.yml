@@ -37,7 +37,7 @@ jobs:
         run: mkdir -p dist
 
       - name: Inline CSS and images
-        run: npx inliner -ni src/index.html > dist/index.html
+        run: inliner -ni src/index.html > dist/index.html
 
       - name: Debug - List dist contents
         run: ls -la dist/
