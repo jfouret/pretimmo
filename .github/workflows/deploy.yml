@@ -40,7 +40,7 @@ jobs:
         run: ls -la src/
 
       - name: Inline CSS and images
-        run: inliner -ni src/index.html > dist/index.html
+        run: bash -c "inliner -ni src/index.html > dist/index.html"
 
       - name: Debug - List dist contents
         run: ls -la dist/
