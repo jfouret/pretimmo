@@ -1,0 +1,370 @@
+/**
+ * Chart Styles
+ * Mortgage Dynamic Simulator - Chart.js Container & Canvas Styles
+ */
+
+/* ========== CHART CONTAINERS ========== */
+
+/* General chart container */
+.chart-container {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--spacing-md);
+}
+
+/* Specific chart containers */
+#content-donut,
+#content-area,
+#content-line {
+  min-height: 400px;
+}
+
+/* Donut chart - centered with max width */
+#content-donut .d-flex {
+  padding: var(--spacing-lg);
+}
+
+#content-donut canvas {
+  max-width: 500px;
+  max-height: 500px;
+  margin: 0 auto;
+}
+
+/* Area and line charts - full width */
+#content-area canvas,
+#content-line canvas {
+  width: 100% !important;
+  max-height: 450px;
+}
+
+/* ========== CANVAS SIZING ========== */
+
+canvas {
+  display: block;
+  box-sizing: border-box;
+  height: auto;
+}
+
+/* Maintain aspect ratio */
+canvas[id^="chart-"] {
+  max-width: 100%;
+  height: auto !important;
+}
+
+/* ========== LEGEND STYLING ========== */
+
+/* Custom legend container */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  justify-content: center;
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-surface-hover);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-fast);
+}
+
+.chart-legend-item:hover {
+  background-color: var(--color-border);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-legend-color {
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.chart-legend-label {
+  color: var(--color-text-primary);
+}
+
+.chart-legend-value {
+  margin-left: var(--spacing-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Donut chart legend */
+#donut-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background-color: var(--color-surface-hover);
+  border-radius: var(--radius-lg);
+}
+
+#donut-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+#donut-legend .legend-item:hover {
+  border-color: var(--color-border-dark);
+  box-shadow: var(--shadow-sm);
+  transform: scale(1.02);
+}
+
+#donut-legend .legend-color {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+#donut-legend .legend-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+#donut-legend .legend-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+#donut-legend .legend-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+#donut-legend .legend-percentage {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-left: var(--spacing-xs);
+}
+
+/* ========== CHART TOOLTIPS (via Chart.js) ========== */
+
+/* Custom tooltip styling class */
+.chartjs-tooltip {
+  opacity: 1;
+  position: absolute;
+  background: rgba(0, 0, 0, 0.9);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  transition: all var(--transition-fast);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  z-index: var(--z-index-tooltip);
+}
+
+.chartjs-tooltip-key {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}
+
+/* ========== RESPONSIVE CHART SIZING ========== */
+
+/* Tablet and up */
+@media (min-width: 768px) {
+  #content-donut,
+  #content-area,
+  #content-line {
+    min-height: 450px;
+  }
+  
+  #content-area canvas,
+  #content-line canvas {
+    max-height: 500px;
+  }
+  
+  #donut-legend {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+}
+
+/* Desktop and up */
+@media (min-width: 992px) {
+  #content-donut,
+  #content-area,
+  #content-line {
+    min-height: 500px;
+  }
+  
+  #content-area canvas,
+  #content-line canvas {
+    max-height: 550px;
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+  #content-donut,
+  #content-area,
+  #content-line {
+    min-height: 300px;
+  }
+  
+  #content-donut canvas {
+    max-width: 100%;
+    max-height: 350px;
+  }
+  
+  #content-area canvas,
+  #content-line canvas {
+    max-height: 300px;
+  }
+  
+  #donut-legend {
+    grid-template-columns: 1fr;
+    padding: var(--spacing-md);
+  }
+  
+  .chart-legend {
+    gap: var(--spacing-sm);
+  }
+  
+  .chart-legend-item {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ========== CHART LOADING STATE ========== */
+
+.chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+}
+
+.chart-loading::before {
+  content: "⏳";
+  display: inline-block;
+  margin-right: var(--spacing-sm);
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ========== CHART EMPTY STATE ========== */
+
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.chart-empty-icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.3;
+}
+
+.chart-empty-text {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--spacing-sm);
+}
+
+.chart-empty-subtext {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* ========== CHART WRAPPER (for maintaining aspect ratio) ========== */
+
+.chart-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+}
+
+.chart-wrapper.aspect-4-3 {
+  padding-bottom: 75%; /* 4:3 aspect ratio */
+}
+
+.chart-wrapper.aspect-1-1 {
+  padding-bottom: 100%; /* 1:1 aspect ratio */
+}
+
+.chart-wrapper canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ========== CHART COLORS (for consistent theming with Chart.js) ========== */
+
+:root {
+  /* Chart color palette - matching design system */
+  --chart-color-primary: #2563eb;
+  --chart-color-success: #16a34a;
+  --chart-color-warning: #ea580c;
+  --chart-color-info: #0ea5e9;
+  --chart-color-danger: #dc2626;
+  --chart-color-purple: #9333ea;
+  --chart-color-pink: #ec4899;
+  --chart-color-gray: #6b7280;
+  
+  /* Chart grid and axes */
+  --chart-grid-color: rgba(203, 213, 225, 0.3);
+  --chart-axis-color: #64748b;
+  --chart-font-family: var(--font-family-base);
+}
+
+/* ========== PRINT STYLES ========== */
+
+@media print {
+  canvas {
+    max-height: none !important;
+  }
+  
+  .chart-legend {
+    page-break-inside: avoid;
+  }
+  
+  #donut-legend {
+    page-break-inside: avoid;
+  }
+}

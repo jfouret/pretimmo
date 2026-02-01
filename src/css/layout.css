@@ -1,0 +1,296 @@
+/**
+ * Layout Styles
+ * Mortgage Dynamic Simulator - Structural Layout
+ */
+
+/* ========== GLOBAL LAYOUT ========== */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+  background-color: var(--color-background);
+  margin: 0;
+  padding: 0;
+}
+
+/* ========== HEADER ========== */
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-index-sticky);
+  min-height: var(--header-height);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  box-shadow: var(--shadow-md);
+}
+
+header h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+/* ========== MAIN CONTAINER ========== */
+
+.container-fluid {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+}
+
+/* ========== TWO-COLUMN LAYOUT ========== */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: calc(var(--spacing-md) * -1);
+}
+
+.row.g-4 {
+  gap: var(--spacing-lg);
+  margin: 0;
+}
+
+/* Left Panel - Inputs */
+.col-lg-4 {
+  flex: 0 0 100%;
+  max-width: 100%;
+}
+
+/* Right Panel - Results */
+.col-lg-8 {
+  flex: 0 0 100%;
+  max-width: 100%;
+}
+
+/* ========== INPUT PANEL STYLING ========== */
+
+.col-lg-4 .card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.col-lg-4 .card-body {
+  padding: var(--spacing-lg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-dark) var(--color-surface);
+}
+
+.col-lg-4 .card-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.col-lg-4 .card-body::-webkit-scrollbar-track {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.col-lg-4 .card-body::-webkit-scrollbar-thumb {
+  background: var(--color-border-dark);
+  border-radius: var(--radius-md);
+}
+
+.col-lg-4 .card-body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ========== RESULTS PANEL STYLING ========== */
+
+.col-lg-8 .card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.col-lg-8 .card-header {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.col-lg-8 .card-body {
+  flex: 1;
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-dark) var(--color-surface);
+}
+
+.col-lg-8 .card-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.col-lg-8 .card-body::-webkit-scrollbar-track {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.col-lg-8 .card-body::-webkit-scrollbar-thumb {
+  background: var(--color-border-dark);
+  border-radius: var(--radius-md);
+}
+
+.col-lg-8 .card-body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ========== SECTIONS ========== */
+
+section {
+  margin-bottom: var(--spacing-xl);
+}
+
+section:last-child {
+  margin-bottom: 0;
+}
+
+section h5 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: var(--spacing-lg) 0;
+}
+
+/* ========== RESPONSIVE BREAKPOINTS ========== */
+
+/* Tablet - 768px and up */
+@media (min-width: 768px) {
+  .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+  
+  .col-md-12 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+/* Desktop - 992px and up */
+@media (min-width: 992px) {
+  /* Two-column layout */
+  .col-lg-4 {
+    flex: 0 0 calc(40% - var(--spacing-lg));
+    max-width: calc(40% - var(--spacing-lg));
+  }
+  
+  .col-lg-8 {
+    flex: 0 0 calc(60% - var(--spacing-lg));
+    max-width: calc(60% - var(--spacing-lg));
+  }
+  
+  /* Summary cards */
+  .col-lg-4.col-md-6 {
+    flex: 0 0 calc(33.333% - var(--spacing-md));
+    max-width: calc(33.333% - var(--spacing-md));
+  }
+  
+  /* Fixed heights for better layout */
+  .col-lg-4 .card-body {
+    max-height: calc(100vh - var(--header-height) - 90px);
+  }
+  
+  .col-lg-8 .card-body {
+    max-height: calc(100vh - var(--header-height) - 140px);
+  }
+}
+
+/* Large Desktop - 1200px and up */
+@media (min-width: 1200px) {
+  .container-fluid {
+    padding-left: var(--spacing-xl);
+    padding-right: var(--spacing-xl);
+  }
+}
+
+/* ========== MOBILE LAYOUT (< 768px) ========== */
+
+@media (max-width: 767px) {
+  /* Header adjustments */
+  header h1 {
+    font-size: var(--font-size-xl);
+  }
+  
+  /* Stack panels vertically */
+  .container-fluid {
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
+  }
+  
+  /* Remove max-height on mobile for better scrolling */
+  .col-lg-4 .card-body,
+  .col-lg-8 .card-body {
+    max-height: none !important;
+  }
+  
+  /* Reduce spacing on mobile */
+  .row.g-4 {
+    gap: var(--spacing-md);
+  }
+  
+  section {
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  hr {
+    margin: var(--spacing-md) 0;
+  }
+}
+
+/* ========== UTILITY CLASSES ========== */
+
+/* Height utilities */
+.h-100 {
+  height: 100% !important;
+}
+
+/* Flex utilities */
+.d-flex {
+  display: flex !important;
+}
+
+.justify-content-between {
+  justify-content: space-between !important;
+}
+
+.justify-content-center {
+  justify-content: center !important;
+}
+
+.align-items-center {
+  align-items: center !important;
+}
+
+/* Spacing utilities */
+.mb-0 { margin-bottom: 0 !important; }
+.mb-2 { margin-bottom: var(--spacing-sm) !important; }
+.mb-3 { margin-bottom: var(--spacing-md) !important; }
+.mb-4 { margin-bottom: var(--spacing-lg) !important; }
+.mt-4 { margin-top: var(--spacing-lg) !important; }
+
+.py-3 { padding-top: var(--spacing-md) !important; padding-bottom: var(--spacing-md) !important; }
+.py-4 { padding-top: var(--spacing-lg) !important; padding-bottom: var(--spacing-lg) !important; }
+.py-5 { padding-top: var(--spacing-xl) !important; padding-bottom: var(--spacing-xl) !important; }
+
+/* Width utilities */
+.w-100 {
+  width: 100% !important;
+}
