@@ -32,7 +32,16 @@ jobs:
         run: mkdir -p dist
 
       - name: Inline CSS and images
-        run: inliner -ni src/index.html > dist/index.html
+        run: npx inliner -ni src/index.html > dist/index.html
+
+      - name: Debug - List dist contents
+        run: ls -la dist/
+
+      - name: Debug - Check file size
+        run: stat -c %s dist/index.html
+
+      - name: Debug - Show first lines of index.html
+        run: head -20 dist/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
