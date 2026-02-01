@@ -15,6 +15,13 @@ var AppDefaults = {
   tableView: 'monthly',
 };
 
+var GigogneDefaults = {
+  enabled: false,
+  maxAmount: 50000,
+  duration: 10,
+  rate: 0,  // PTZ default
+};
+
 var ItemDefaults = {
   revenue: {
     type: 'Salaire',      // Fixed: was 'salary' in state.js, now consistent
@@ -105,6 +112,7 @@ var FormulaConstants = {
 // Expose all config objects globally
 Object.assign(window.Config, {
   AppDefaults,
+  GigogneDefaults,
   ItemDefaults,
   UIOptions,
   FormulaConstants

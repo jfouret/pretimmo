@@ -5,7 +5,7 @@
  */
 
 // Use global Config object (set by config.js)
-var { AppDefaults, ItemDefaults } = window.Config || {};
+var { AppDefaults, ItemDefaults, GigogneDefaults } = window.Config || {};
 
 const MortgageSimulator = (() => {
   // Private ID counter for dynamic rows
@@ -24,6 +24,10 @@ const MortgageSimulator = (() => {
     propertyType: AppDefaults.propertyType,
     propertyPrice: AppDefaults.propertyPrice,  // Fixed: now 250000
     
+    // Gigogne state
+    gigogne: { ...GigogneDefaults, optimalAmount: 0, actualAmount: 0 },
+    primaryRateOverride: null,
+
     // Computed values (cached)
     maxLoan: 0,
     maxPropertyPrice: 0,
@@ -122,6 +126,22 @@ const MortgageSimulator = (() => {
      */
     getRates() {
       return { ...state.rates };
+    },
+
+    /**
+     * Get gigogne state
+     * @returns {Object} Gigogne state object
+     */
+    getGigogne() {
+      return { ...state.gigogne };
+    },
+
+    /**
+     * Get primary rate override
+     * @returns {number|null} Override rate or null
+     */
+    getPrimaryRateOverride() {
+      return state.primaryRateOverride;
     },
 
     /**
@@ -295,6 +315,56 @@ const MortgageSimulator = (() => {
     },
 
     /**
+     * Set gigogne enabled state
+     * @param {boolean} enabled - Enabled state
+     */
+    setGigogneEnabled(enabled) {
+      state.gigogne.enabled = enabled;
+    },
+
+    /**
+     * Set gigogne max amount
+     * @param {number} amount - Max amount
+     */
+    setGigogneMaxAmount(amount) {
+      state.gigogne.maxAmount = amount;
+    },
+
+    /**
+     * Set gigogne duration
+     * @param {number} duration - Duration in years
+     */
+    setGigogneDuration(duration) {
+      state.gigogne.duration = duration;
+    },
+
+    /**
+     * Set gigogne rate
+     * @param {number} rate - Rate percentage
+     */
+    setGigogneRate(rate) {
+      state.gigogne.rate = rate;
+    },
+
+    /**
+     * Set gigogne optimal and actual amounts
+     * @param {number} optimal - Calculated optimal amount
+     */
+    setGigogneOptimalAmount(optimal) {
+      state.gigogne.optimalAmount = optimal;
+      // Actual amount is limited by user-defined max
+      state.gigogne.actualAmount = Math.min(optimal, state.gigogne.maxAmount);
+    },
+
+    /**
+     * Set primary rate override
+     * @param {number|null} rate - Rate or null
+     */
+    setPrimaryRateOverride(rate) {
+      state.primaryRateOverride = rate;
+    },
+
+    /**
      * Set loan duration
      * @param {number} duration - Duration in years
      */
@@ -449,6 +519,10 @@ const MortgageSimulator = (() => {
       state.propertyType = AppDefaults.propertyType;
       state.propertyPrice = AppDefaults.propertyPrice;  // Fixed: now 250000
       
+      // Reset gigogne state
+      state.gigogne = { ...GigogneDefaults, optimalAmount: 0, actualAmount: 0 };
+      state.primaryRateOverride = null;
+
       // Reset computed values
       state.maxLoan = 0;
       state.maxPropertyPrice = 0;

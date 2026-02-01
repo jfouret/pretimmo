@@ -45,9 +45,22 @@ const Events = (() => {
     const maxMonthlyPayment = MortgageSimulator.Formulas.calcMaxMonthlyPayment(monthlyIncome, monthlyCharges);
     
     // 2. Get interpolated interest rate for current duration
-    const currentRate = MortgageSimulator.Formulas.interpolateRate(state.duration, state.rates);
+    let currentRate = MortgageSimulator.Formulas.interpolateRate(state.duration, state.rates);
+    
+    // Handle override
+    const override = MortgageSimulator.getPrimaryRateOverride();
+    if (override !== null) {
+      currentRate = override;
+    }
+    
+    // Update UI for primary rate (if UI module has this method)
+    if (UI.updatePrimaryRateDisplay) {
+      UI.updatePrimaryRateDisplay(currentRate);
+    }
     
     // 3. Calculate maximum loan capacity (without insurance consideration)
+    // If gigogne is enabled, this might change? 
+    // For now, keep standard max loan calculation as baseline
     const maxLoan = MortgageSimulator.Formulas.calcMaxLoan(
       maxMonthlyPayment,
       currentRate,
@@ -112,49 +125,128 @@ const Events = (() => {
     MortgageSimulator.setNotaryFees(requiredLoanResult.notaryFees || 0);
     MortgageSimulator.setCautionFees(requiredLoanResult.caution || 0);
     
-    // 6. Calculate monthly payment for required loan
-    const monthlyPayment = MortgageSimulator.Formulas.calcMonthlyPayment(
-      requiredLoanResult.loan,
-      currentRate,
-      state.duration
-    );
-    MortgageSimulator.setMonthlyPayment(monthlyPayment);
-    
-    // 7. Calculate insurance
+    // GIGOGNE LOGIC START
+    const gigogne = MortgageSimulator.getGigogne();
+    let monthlyPayment, monthlyInsurance, monthlyPaymentWithInsurance, totalCost, taeg, amortizationTable;
     let insuranceRate = 0;
-    if (ages.person1) {
-      insuranceRate = MortgageSimulator.Formulas.getInsuranceRate(ages.person1);
+    if (state.ages.person1) {
+      insuranceRate = MortgageSimulator.Formulas.getInsuranceRate(state.ages.person1);
     }
-    const monthlyInsurance = MortgageSimulator.Formulas.calcMonthlyInsurance(
-      requiredLoanResult.loan,
-      insuranceRate
-    );
-    MortgageSimulator.setMonthlyInsurance(monthlyInsurance);
-    const monthlyPaymentWithInsurance = monthlyPayment + monthlyInsurance;
-    MortgageSimulator.setMonthlyPaymentWithInsurance(monthlyPaymentWithInsurance);
-    
-    // 8. Calculate total cost and TAEG
-    const totalCost = (monthlyPayment + monthlyInsurance) * state.duration * 12;
-    MortgageSimulator.setTotalCost(totalCost);
-    
-    // Use optimized TAEG calculation with optimization-js
-    const taeg = MortgageSimulator.Formulas.calcTAEG(
-      requiredLoanResult.loan,
-      monthlyPaymentWithInsurance, // Total monthly payment including insurance
-      state.duration,
-      currentRate, // Nominal rate
-      insuranceRate // Insurance rate
-    );
-    MortgageSimulator.setTaeg(taeg);
-    
-    // 9. Generate amortization table
-    const amortizationTable = MortgageSimulator.Formulas.generateAmortizationTable(
-      requiredLoanResult.loan,
-      currentRate,
-      state.duration,
-      insuranceRate
-    );
-    MortgageSimulator.setAmortizationTable(amortizationTable);
+
+    if (gigogne.enabled) {
+      // Calculate optimal secondary amount
+      const optimalSecondary = MortgageSimulator.Formulas.calcOptimalSecondaryAmount(
+        requiredLoanResult.loan,
+        currentRate,
+        state.duration,
+        gigogne.rate,
+        gigogne.duration,
+        gigogne.maxAmount
+      );
+      
+      MortgageSimulator.setGigogneOptimalAmount(optimalSecondary);
+      
+      // Get actual amount (limited by maxAmount, handled in setter)
+      const actualGigogne = MortgageSimulator.getGigogne().actualAmount;
+      const primaryAmount = requiredLoanResult.loan - actualGigogne;
+      
+      // Calculate smooth mensuality
+      monthlyPayment = MortgageSimulator.Formulas.calcSmoothMensuality(
+        primaryAmount,
+        currentRate,
+        state.duration,
+        actualGigogne,
+        gigogne.rate,
+        gigogne.duration
+      );
+      
+      MortgageSimulator.setMonthlyPayment(monthlyPayment);
+      
+      // Calculate insurance (on total initial capital)
+      monthlyInsurance = MortgageSimulator.Formulas.calcMonthlyInsurance(
+        requiredLoanResult.loan,
+        insuranceRate
+      );
+      MortgageSimulator.setMonthlyInsurance(monthlyInsurance);
+      
+      monthlyPaymentWithInsurance = monthlyPayment + monthlyInsurance;
+      MortgageSimulator.setMonthlyPaymentWithInsurance(monthlyPaymentWithInsurance);
+      
+      // Generate gigogne amortization table
+      amortizationTable = MortgageSimulator.Formulas.generateGigogneAmortizationTable({
+        p1: primaryAmount,
+        r1: currentRate,
+        n1: state.duration,
+        p2: actualGigogne,
+        r2: gigogne.rate,
+        n2: gigogne.duration,
+        insuranceRate: insuranceRate
+      });
+      MortgageSimulator.setAmortizationTable(amortizationTable);
+      
+      // Calculate total cost
+      totalCost = amortizationTable[amortizationTable.length - 1].totalPaid;
+      MortgageSimulator.setTotalCost(totalCost);
+      
+      // Calculate TAEG
+      taeg = MortgageSimulator.Formulas.calcTAEG(
+        requiredLoanResult.loan,
+        monthlyPaymentWithInsurance,
+        state.duration,
+        currentRate,
+        insuranceRate
+      );
+      MortgageSimulator.setTaeg(taeg);
+      
+      // Update UI for gigogne specific fields
+      if (UI.updateGigogneInfo) {
+        UI.updateGigogneInfo(optimalSecondary, actualGigogne);
+      }
+
+    } else {
+      // STANDARD LOGIC
+      
+      // 6. Calculate monthly payment for required loan
+      monthlyPayment = MortgageSimulator.Formulas.calcMonthlyPayment(
+        requiredLoanResult.loan,
+        currentRate,
+        state.duration
+      );
+      MortgageSimulator.setMonthlyPayment(monthlyPayment);
+      
+      // 7. Calculate insurance
+      monthlyInsurance = MortgageSimulator.Formulas.calcMonthlyInsurance(
+        requiredLoanResult.loan,
+        insuranceRate
+      );
+      MortgageSimulator.setMonthlyInsurance(monthlyInsurance);
+      monthlyPaymentWithInsurance = monthlyPayment + monthlyInsurance;
+      MortgageSimulator.setMonthlyPaymentWithInsurance(monthlyPaymentWithInsurance);
+      
+      // 8. Calculate total cost and TAEG
+      totalCost = (monthlyPayment + monthlyInsurance) * state.duration * 12;
+      MortgageSimulator.setTotalCost(totalCost);
+      
+      // Use optimized TAEG calculation with optimization-js
+      taeg = MortgageSimulator.Formulas.calcTAEG(
+        requiredLoanResult.loan,
+        monthlyPaymentWithInsurance, // Total monthly payment including insurance
+        state.duration,
+        currentRate, // Nominal rate
+        insuranceRate // Insurance rate
+      );
+      MortgageSimulator.setTaeg(taeg);
+      
+      // 9. Generate amortization table
+      amortizationTable = MortgageSimulator.Formulas.generateAmortizationTable(
+        requiredLoanResult.loan,
+        currentRate,
+        state.duration,
+        insuranceRate
+      );
+      MortgageSimulator.setAmortizationTable(amortizationTable);
+    }
+    // GIGOGNE LOGIC END
     
     // 10. Update UI - Summary
     const debtRatio = monthlyIncome > 0 ? (monthlyPaymentWithInsurance / monthlyIncome) * 100 : 0;
@@ -173,6 +265,11 @@ const Events = (() => {
       cautionFees: requiredLoanResult.caution || 0,
       capital: state.capital,
       fraisDossier: state.fraisDossier,
+      // Add gigogne info for summary
+      gigogne: gigogne.enabled ? {
+        primaryAmount: requiredLoanResult.loan - MortgageSimulator.getGigogne().actualAmount,
+        secondaryAmount: MortgageSimulator.getGigogne().actualAmount
+      } : null
     });
     
     // 11. Update table view
@@ -189,6 +286,7 @@ const Events = (() => {
         interest: totalInterest,
         insurance: totalInsurance,
         amortization: amortizationTable,
+        gigogne: gigogne.enabled // Pass gigogne flag
       };
       Charts.updateAll(chartData);
     }
@@ -196,6 +294,51 @@ const Events = (() => {
 
   // Debounced version for rapid input changes
   const debouncedRecalculate = debounce(recalculate, 150);
+
+  // ============================================
+  // EVENT HANDLERS: GIGOGNE
+  // ============================================
+
+  const handleGigogneToggle = (e) => {
+    const enabled = e.target.checked;
+    MortgageSimulator.setGigogneEnabled(enabled);
+    if (UI.renderGigogneFields) {
+      UI.renderGigogneFields(enabled);
+    }
+    debouncedRecalculate();
+  };
+
+  const handleGigogneMaxAmountChange = (e) => {
+    const amount = parseFloat(e.target.value) || 0;
+    MortgageSimulator.setGigogneMaxAmount(amount);
+    debouncedRecalculate();
+  };
+
+  const handleGigogneDurationChange = (e) => {
+    const duration = parseInt(e.target.value);
+    MortgageSimulator.setGigogneDuration(duration);
+    
+    const display = document.getElementById('gigogne-duration-value');
+    if (display) display.textContent = duration;
+    
+    debouncedRecalculate();
+  };
+
+  const handleGigogneRateChange = (e) => {
+    const rate = parseFloat(e.target.value) || 0;
+    MortgageSimulator.setGigogneRate(rate);
+    debouncedRecalculate();
+  };
+
+  const handlePrimaryRateChange = (e) => {
+    const val = e.target.value;
+    if (val === '') {
+      MortgageSimulator.setPrimaryRateOverride(null);
+    } else {
+      MortgageSimulator.setPrimaryRateOverride(parseFloat(val));
+    }
+    debouncedRecalculate();
+  };
 
   // ============================================
   // EVENT HANDLERS: REVENUE/CHARGE DYNAMIC ROWS
@@ -634,6 +777,32 @@ const Events = (() => {
     const toggleViewBtn = document.getElementById('toggle-view-btn');
     if (toggleViewBtn) {
       toggleViewBtn.addEventListener('click', handleToggleView);
+    }
+
+    // Gigogne
+    const gigogneEnabled = document.getElementById('gigogne-enabled');
+    if (gigogneEnabled) {
+      gigogneEnabled.addEventListener('change', handleGigogneToggle);
+    }
+
+    const gigogneMaxAmount = document.getElementById('gigogne-max-amount');
+    if (gigogneMaxAmount) {
+      gigogneMaxAmount.addEventListener('input', handleGigogneMaxAmountChange);
+    }
+
+    const gigogneDuration = document.getElementById('gigogne-duration');
+    if (gigogneDuration) {
+      gigogneDuration.addEventListener('input', handleGigogneDurationChange);
+    }
+
+    const gigogneRate = document.getElementById('gigogne-rate');
+    if (gigogneRate) {
+      gigogneRate.addEventListener('input', handleGigogneRateChange);
+    }
+
+    const primaryRate = document.getElementById('primary-rate');
+    if (primaryRate) {
+      primaryRate.addEventListener('input', handlePrimaryRateChange);
     }
 
     // Initial calculation on load

@@ -137,6 +137,41 @@ MortgageSimulator.Events = Events;
       if (agePerson1Input) {
         agePerson1Input.value = MortgageSimulator.getAges().person1 || '';
       }
+
+      // Initialize Gigogne UI
+      const gigogne = MortgageSimulator.getGigogne();
+      const gigogneEnabled = document.getElementById('gigogne-enabled');
+      const gigogneMaxAmount = document.getElementById('gigogne-max-amount');
+      const gigogneDuration = document.getElementById('gigogne-duration');
+      const gigogneRate = document.getElementById('gigogne-rate');
+      const gigogneDurationValue = document.getElementById('gigogne-duration-value');
+
+      if (gigogneEnabled) gigogneEnabled.checked = gigogne.enabled;
+      if (gigogneMaxAmount) gigogneMaxAmount.value = gigogne.maxAmount;
+      if (gigogneDuration) gigogneDuration.value = gigogne.duration;
+      if (gigogneRate) gigogneRate.value = gigogne.rate;
+      if (gigogneDurationValue) gigogneDurationValue.textContent = gigogne.duration;
+
+      // Render gigogne fields visibility
+      if (UI.renderGigogneFields) {
+        UI.renderGigogneFields(gigogne.enabled);
+      }
+
+      // Initialize Primary Rate Override
+      const primaryRateOverride = MortgageSimulator.getPrimaryRateOverride();
+      const primaryRateInput = document.getElementById('primary-rate');
+      if (primaryRateInput) {
+        if (primaryRateOverride !== null) {
+          primaryRateInput.value = primaryRateOverride;
+        } else {
+          // If no override, show interpolated rate
+          const currentRate = MortgageSimulator.Formulas.interpolateRate(
+            MortgageSimulator.getDuration(),
+            MortgageSimulator.getRates()
+          );
+          primaryRateInput.value = currentRate;
+        }
+      }
       
       // Show summary tab by default
       UI.showTab('summary');

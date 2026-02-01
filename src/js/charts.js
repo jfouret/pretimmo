@@ -21,7 +21,13 @@ const Charts = (() => {
     warningLight: 'rgba(234, 88, 12, 0.8)',
     primaryArea: 'rgba(37, 99, 235, 0.6)',
     successArea: 'rgba(22, 163, 74, 0.6)',
-    warningArea: 'rgba(234, 88, 12, 0.6)'
+    warningArea: 'rgba(234, 88, 12, 0.6)',
+    // Gigogne colors
+    secondary: '#0ea5e9',    // Light Blue - Principal P2
+    secondaryLight: 'rgba(14, 165, 233, 0.8)',
+    secondaryArea: 'rgba(14, 165, 233, 0.6)',
+    success2: '#86efac',     // Light Green - Interest P2
+    success2Area: 'rgba(134, 239, 172, 0.6)',
   };
 
   /**
@@ -82,27 +88,62 @@ const Charts = (() => {
     }
 
     const total = data.principal + data.interest + data.insurance;
-    const percentages = {
-      principal: ((data.principal / total) * 100),
-      interest: ((data.interest / total) * 100),
-      insurance: ((data.insurance / total) * 100)
-    };
+    
+    let labels, datasetData, backgroundColors;
+
+    if (data.gigogne) {
+      // Gigogne breakdown
+      // We need P1/P2 split for principal and interest.
+      // The data object passed to renderDonut needs to contain these if we want to show them.
+      // Currently updateAll passes { principal, interest, insurance, gigogne }.
+      // We need to calculate P1/P2 split from amortization table or pass it explicitly.
+      // Let's assume updateAll passes the full amortization table so we can sum it up.
+      
+      const amort = data.amortization || [];
+      let p1 = 0, p2 = 0, i1 = 0, i2 = 0;
+      amort.forEach(row => {
+        p1 += row.principalP1 || 0;
+        p2 += row.principalP2 || 0;
+        i1 += row.interestP1 || 0;
+        i2 += row.interestP2 || 0;
+      });
+      
+      labels = [
+        'Principal P1',
+        'Principal P2',
+        'Intérêts P1',
+        'Intérêts P2',
+        'Assurance'
+      ];
+      datasetData = [p1, p2, i1, i2, data.insurance];
+      backgroundColors = [
+        colors.primary,
+        colors.secondary,
+        colors.success,
+        colors.success2,
+        colors.warning
+      ];
+    } else {
+      labels = [
+        'Principal (capital remboursé)',
+        'Intérêts',
+        'Assurance'
+      ];
+      datasetData = [data.principal, data.interest, data.insurance];
+      backgroundColors = [
+        colors.primary,
+        colors.success,
+        colors.warning
+      ];
+    }
 
     instances.donut = new Chart(canvas, {
       type: 'doughnut',
       data: {
-        labels: [
-          'Principal (capital remboursé)',
-          'Intérêts',
-          'Assurance'
-        ],
+        labels: labels,
         datasets: [{
-          data: [data.principal, data.interest, data.insurance],
-          backgroundColor: [
-            colors.primary,
-            colors.success,
-            colors.warning
-          ],
+          data: datasetData,
+          backgroundColor: backgroundColors,
           borderWidth: 2,
           borderColor: '#ffffff'
         }]
@@ -178,6 +219,7 @@ const Charts = (() => {
     }
 
     const amort = data.amortization;
+    const isGigogne = data.gigogne;
     
     // Group by year for better visualization (monthly data would be too dense)
     const yearlyData = {};
@@ -188,48 +230,110 @@ const Charts = (() => {
           principalPart: 0,
           interestPart: 0,
           insurance: 0,
+          // Gigogne
+          principalP1: 0,
+          principalP2: 0,
+          interestP1: 0,
+          interestP2: 0,
           count: 0
         };
       }
-      yearlyData[year].principalPart += row.principalPart;
-      yearlyData[year].interestPart += row.interestPart;
+      yearlyData[year].principalPart += row.principalPart || (row.principalP1 + row.principalP2);
+      yearlyData[year].interestPart += row.interestPart || (row.interestP1 + row.interestP2);
       yearlyData[year].insurance += row.insurance;
+      
+      if (isGigogne) {
+        yearlyData[year].principalP1 += row.principalP1 || 0;
+        yearlyData[year].principalP2 += row.principalP2 || 0;
+        yearlyData[year].interestP1 += row.interestP1 || 0;
+        yearlyData[year].interestP2 += row.interestP2 || 0;
+      }
+      
       yearlyData[year].count++;
     });
 
     // Convert to arrays
     const years = Object.keys(yearlyData).map(Number).sort((a, b) => a - b);
-    const principalData = years.map(year => yearlyData[year].principalPart);
-    const interestData = years.map(year => yearlyData[year].interestPart);
     const insuranceData = years.map(year => yearlyData[year].insurance);
+    
+    let datasets;
+    if (isGigogne) {
+      const p1Data = years.map(year => yearlyData[year].principalP1);
+      const p2Data = years.map(year => yearlyData[year].principalP2);
+      const i1Data = years.map(year => yearlyData[year].interestP1);
+      const i2Data = years.map(year => yearlyData[year].interestP2);
+      
+      datasets = [
+        {
+          label: 'Assurance',
+          data: insuranceData,
+          backgroundColor: colors.warningArea,
+          borderColor: colors.warning,
+          borderWidth: 1
+        },
+        {
+          label: 'Intérêts P2',
+          data: i2Data,
+          backgroundColor: colors.success2Area,
+          borderColor: colors.success2,
+          borderWidth: 1
+        },
+        {
+          label: 'Intérêts P1',
+          data: i1Data,
+          backgroundColor: colors.successArea,
+          borderColor: colors.success,
+          borderWidth: 1
+        },
+        {
+          label: 'Principal P2',
+          data: p2Data,
+          backgroundColor: colors.secondaryArea,
+          borderColor: colors.secondary,
+          borderWidth: 1
+        },
+        {
+          label: 'Principal P1',
+          data: p1Data,
+          backgroundColor: colors.primaryArea,
+          borderColor: colors.primary,
+          borderWidth: 1
+        }
+      ];
+    } else {
+      const principalData = years.map(year => yearlyData[year].principalPart);
+      const interestData = years.map(year => yearlyData[year].interestPart);
+      
+      datasets = [
+        {
+          label: 'Assurance',
+          data: insuranceData,
+          backgroundColor: colors.warningArea,
+          borderColor: colors.warning,
+          borderWidth: 1
+        },
+        {
+          label: 'Intérêts',
+          data: interestData,
+          backgroundColor: colors.successArea,
+          borderColor: colors.success,
+          borderWidth: 1
+        },
+        {
+          label: 'Principal',
+          data: principalData,
+          backgroundColor: colors.primaryArea,
+          borderColor: colors.primary,
+          borderWidth: 1
+        }
+      ];
+    }
 
     instances.area = new Chart(canvas, {
       type: 'bar',
       data: {
         labels: years.map(y => `Année ${y}`),
-        datasets: [
-          {
-            label: 'Assurance',
-            data: insuranceData,
-            backgroundColor: colors.warningArea,
-            borderColor: colors.warning,
-            borderWidth: 1
-          },
-          {
-            label: 'Intérêts',
-            data: interestData,
-            backgroundColor: colors.successArea,
-            borderColor: colors.success,
-            borderWidth: 1
-          },
-          {
-            label: 'Principal',
-            data: principalData,
-            backgroundColor: colors.primaryArea,
-            borderColor: colors.primary,
-            borderWidth: 1
-          }
-        ]
+        datasets: datasets
       },
       options: {
         responsive: true,
@@ -314,65 +418,26 @@ const Charts = (() => {
     }
 
     const amort = data.amortization;
+    const isGigogne = data.gigogne;
     
-    // Sample data points - take one point per year for clearer visualization
-    const sampledData = [];
-    let currentYear = null;
-    amort.forEach((row, index) => {
-      if (index === 0 || row.year !== currentYear || index === amort.length - 1) {
-        sampledData.push(row);
-        currentYear = row.year;
-      }
-    });
-
-    // Calculate cumulative total paid
-    let cumulativePaid = 0;
-    const labels = sampledData.map(row => `Année ${row.year}`);
-    const remainingBalance = sampledData.map(row => row.remainingCapital);
-    const totalPaidData = sampledData.map(row => {
-      cumulativePaid += row.payment + row.insurance;
-      return cumulativePaid;
-    });
-
-    // Reset for actual calculation (per year basis)
-    const yearlyTotals = {};
-    amort.forEach(row => {
-      if (!yearlyTotals[row.year]) {
-        yearlyTotals[row.year] = 0;
-      }
-      yearlyTotals[row.year] += (row.payment + row.insurance);
-    });
-
-    // Recalculate cumulative based on yearly
-    cumulativePaid = 0;
-    const correctTotalPaid = sampledData.map(row => {
-      for (let y = 1; y <= row.year; y++) {
-        if (yearlyTotals[y] && row.year === y) {
-          cumulativePaid += yearlyTotals[y];
-          break;
-        } else if (yearlyTotals[y] && row.year > y && !yearlyTotals[y].counted) {
-          cumulativePaid += yearlyTotals[y];
-          yearlyTotals[y].counted = true;
-        }
-      }
-      return cumulativePaid;
-    });
-
     // Simpler approach: use end of each year
-    const yearEndData = [];
-    let runningTotal = 0;
     const yearDataMap = {};
+    let runningTotal = 0;
     
     amort.forEach(row => {
       if (!yearDataMap[row.year]) {
         yearDataMap[row.year] = {
           remainingCapital: 0,
+          remainingCapitalP1: 0,
+          remainingCapitalP2: 0,
           totalPaid: 0,
           year: row.year
         };
       }
       yearDataMap[row.year] = {
-        remainingCapital: row.remainingCapital,
+        remainingCapital: row.remainingCapital || (row.remainingCapitalP1 + row.remainingCapitalP2),
+        remainingCapitalP1: row.remainingCapitalP1 || 0,
+        remainingCapitalP2: row.remainingCapitalP2 || 0,
         totalPaid: runningTotal + row.payment + row.insurance,
         year: row.year
       };
@@ -381,38 +446,81 @@ const Charts = (() => {
 
     const years = Object.keys(yearDataMap).map(Number).sort((a, b) => a - b);
     const finalLabels = years.map(y => `Année ${y}`);
-    const finalRemaining = years.map(y => yearDataMap[y].remainingCapital);
     const finalTotalPaid = years.map(y => yearDataMap[y].totalPaid);
+    
+    let datasets;
+    if (isGigogne) {
+      const finalRemainingP1 = years.map(y => yearDataMap[y].remainingCapitalP1);
+      const finalRemainingP2 = years.map(y => yearDataMap[y].remainingCapitalP2);
+      
+      datasets = [
+        {
+          label: 'Capital restant P1',
+          data: finalRemainingP1,
+          borderColor: colors.primary,
+          backgroundColor: colors.primaryLight,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 3
+        },
+        {
+          label: 'Capital restant P2',
+          data: finalRemainingP2,
+          borderColor: colors.secondary,
+          backgroundColor: colors.secondaryLight,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 3,
+          borderDash: [5, 5]
+        },
+        {
+          label: 'Total payé',
+          data: finalTotalPaid,
+          borderColor: colors.success,
+          backgroundColor: colors.successLight,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 3,
+          borderDash: [2, 2]
+        }
+      ];
+    } else {
+      const finalRemaining = years.map(y => yearDataMap[y].remainingCapital);
+      datasets = [
+        {
+          label: 'Capital restant dû',
+          data: finalRemaining,
+          borderColor: colors.primary,
+          backgroundColor: colors.primaryLight,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 3,
+          pointHoverRadius: 5
+        },
+        {
+          label: 'Total payé',
+          data: finalTotalPaid,
+          borderColor: colors.success,
+          backgroundColor: colors.successLight,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          borderDash: [5, 5]
+        }
+      ];
+    }
 
     instances.line = new Chart(canvas, {
       type: 'line',
       data: {
         labels: finalLabels,
-        datasets: [
-          {
-            label: 'Capital restant dû',
-            data: finalRemaining,
-            borderColor: colors.primary,
-            backgroundColor: colors.primaryLight,
-            borderWidth: 2,
-            fill: false,
-            tension: 0.1,
-            pointRadius: 3,
-            pointHoverRadius: 5
-          },
-          {
-            label: 'Total payé',
-            data: finalTotalPaid,
-            borderColor: colors.success,
-            backgroundColor: colors.successLight,
-            borderWidth: 2,
-            fill: false,
-            tension: 0.1,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            borderDash: [5, 5]
-          }
-        ]
+        datasets: datasets
       },
       options: {
         responsive: true,
@@ -477,15 +585,19 @@ const Charts = (() => {
     renderDonut({
       principal: data.principal || 0,
       interest: data.interest || 0,
-      insurance: data.insurance || 0
+      insurance: data.insurance || 0,
+      gigogne: data.gigogne,
+      amortization: data.amortization // Pass full amortization for gigogne split
     });
 
     renderStackedArea({
-      amortization: data.amortization || []
+      amortization: data.amortization || [],
+      gigogne: data.gigogne
     });
 
     renderLineChart({
-      amortization: data.amortization || []
+      amortization: data.amortization || [],
+      gigogne: data.gigogne
     });
   };
 

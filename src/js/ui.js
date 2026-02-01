@@ -250,6 +250,48 @@ const UI = (() => {
   };
 
   // ============================================
+  // GIGOGNE UI HELPERS
+  // ============================================
+
+  /**
+   * Show/hide gigogne fields
+   * @param {boolean} enabled - Whether gigogne is enabled
+   */
+  const renderGigogneFields = (enabled) => {
+    const fields = document.getElementById('gigogne-fields');
+    if (fields) {
+      if (enabled) {
+        fields.classList.remove('d-none');
+      } else {
+        fields.classList.add('d-none');
+      }
+    }
+  };
+
+  /**
+   * Update primary rate display
+   * @param {number} rate - Current primary rate
+   */
+  const updatePrimaryRateDisplay = (rate) => {
+    const input = document.getElementById('primary-rate');
+    if (input && document.activeElement !== input) {
+      input.value = rate;
+    }
+  };
+
+  /**
+   * Update gigogne info display
+   * @param {number} optimal - Optimal amount
+   * @param {number} actual - Actual amount used
+   */
+  const updateGigogneInfo = (optimal, actual) => {
+    const optimalEl = document.getElementById('gigogne-optimal-amount');
+    if (optimalEl) {
+      optimalEl.textContent = formatCurrency(optimal);
+    }
+  };
+
+  // ============================================
   // SUMMARY DASHBOARD
   // ============================================
 
@@ -284,13 +326,20 @@ const UI = (() => {
     // Loan amount
     const loanAmountEl = document.getElementById('summary-loan-amount');
     if (loanAmountEl) {
-      loanAmountEl.textContent = formatCurrency(data.loanAmount || data.requiredLoan);
+      if (data.gigogne) {
+        loanAmountEl.innerHTML = `${formatCurrency(data.loanAmount)}<br><small class="text-muted">P1: ${formatCurrency(data.gigogne.primaryAmount)} | P2: ${formatCurrency(data.gigogne.secondaryAmount)}</small>`;
+      } else {
+        loanAmountEl.textContent = formatCurrency(data.loanAmount || data.requiredLoan);
+      }
     }
 
     // Monthly payment (without insurance)
     const monthlyPaymentEl = document.getElementById('summary-monthly-payment');
     if (monthlyPaymentEl) {
       monthlyPaymentEl.textContent = formatCurrency(data.monthlyPayment);
+      if (data.gigogne) {
+        monthlyPaymentEl.innerHTML += ' <small class="text-muted">(lissée)</small>';
+      }
     }
 
     // Monthly payment (with insurance)
@@ -476,6 +525,8 @@ const UI = (() => {
     const yearly = [];
     let currentYear = null;
     let yearData = null;
+    
+    const isGigogne = data.length > 0 && data[0].paymentP2 !== undefined;
 
     data.forEach((row, index) => {
       const year = Math.ceil((index + 1) / 12);
@@ -494,6 +545,13 @@ const UI = (() => {
           insurance: 0,
           totalPaid: row.totalPaid || 0,
           remainingCapital: row.remainingCapital || 0,
+          // Gigogne fields
+          principalP1: 0,
+          interestP1: 0,
+          principalP2: 0,
+          interestP2: 0,
+          remainingCapitalP1: row.remainingCapitalP1 || 0,
+          remainingCapitalP2: row.remainingCapitalP2 || 0,
         };
       }
       
@@ -503,6 +561,15 @@ const UI = (() => {
       yearData.insurance += (row.insurance || 0);
       yearData.totalPaid = row.totalPaid || 0;
       yearData.remainingCapital = row.remainingCapital || 0;
+      
+      if (isGigogne) {
+        yearData.principalP1 += (row.principalP1 || 0);
+        yearData.interestP1 += (row.interestP1 || 0);
+        yearData.principalP2 += (row.principalP2 || 0);
+        yearData.interestP2 += (row.interestP2 || 0);
+        yearData.remainingCapitalP1 = row.remainingCapitalP1 || 0;
+        yearData.remainingCapitalP2 = row.remainingCapitalP2 || 0;
+      }
     });
     
     if (yearData) {
@@ -519,7 +586,40 @@ const UI = (() => {
    */
   const renderTable = (data, view = 'monthly') => {
     const tbody = document.getElementById('amortization-table-body');
-    if (!tbody) return;
+    const thead = document.querySelector('#amortization-table thead tr');
+    
+    if (!tbody || !thead) return;
+
+    // Check if data has gigogne fields
+    const isGigogne = data && data.length > 0 && data[0].paymentP2 !== undefined;
+
+    // Update headers
+    if (isGigogne) {
+      thead.innerHTML = `
+        <th>${view === 'yearly' ? 'Année' : 'Mois'}</th>
+        ${view === 'monthly' ? '<th>Année</th>' : ''}
+        <th>Mensualité</th>
+        <th>Capital P1</th>
+        <th>Intérêts P1</th>
+        <th>Capital P2</th>
+        <th>Intérêts P2</th>
+        <th>Assurance</th>
+        <th>Total payé</th>
+        <th>Restant P1</th>
+        <th>Restant P2</th>
+      `;
+    } else {
+      thead.innerHTML = `
+        <th>${view === 'yearly' ? 'Année' : 'Mois'}</th>
+        ${view === 'monthly' ? '<th>Année</th>' : ''}
+        <th>Mensualité</th>
+        <th>Capital</th>
+        <th>Intérêts</th>
+        <th>Assurance</th>
+        <th>Total payé</th>
+        <th>Capital restant</th>
+      `;
+    }
 
     // Clear existing rows
     tbody.innerHTML = '';
@@ -545,45 +645,78 @@ const UI = (() => {
       const row = processedData[i];
       const tr = document.createElement('tr');
 
-      // Month
-      const tdMonth = document.createElement('td');
-      tdMonth.textContent = view === 'yearly' ? `Année ${row.year}` : row.month || (i + 1);
-      tr.appendChild(tdMonth);
+      if (isGigogne) {
+        // Gigogne Row
+        const tdTime = document.createElement('td');
+        tdTime.textContent = view === 'yearly' ? `Année ${row.year}` : row.month || (i + 1);
+        tr.appendChild(tdTime);
 
-      // Year
-      const tdYear = document.createElement('td');
-      tdYear.textContent = row.year || Math.ceil((i + 1) / 12);
-      tr.appendChild(tdYear);
+        if (view === 'monthly') {
+          const tdYear = document.createElement('td');
+          tdYear.textContent = row.year || Math.ceil((i + 1) / 12);
+          tr.appendChild(tdYear);
+        }
 
-      // Payment
-      const tdPayment = document.createElement('td');
-      tdPayment.textContent = formatCurrency(row.payment);
-      tr.appendChild(tdPayment);
+        const createCell = (val) => {
+          const td = document.createElement('td');
+          td.textContent = formatCurrency(val);
+          return td;
+        };
 
-      // Principal
-      const tdPrincipal = document.createElement('td');
-      tdPrincipal.textContent = formatCurrency(row.principalPart);
-      tr.appendChild(tdPrincipal);
+        tr.appendChild(createCell(row.payment));
+        tr.appendChild(createCell(row.principalP1 || row.principalPart)); // Fallback if aggregated differently
+        tr.appendChild(createCell(row.interestP1 || row.interestPart));
+        tr.appendChild(createCell(row.principalP2 || 0));
+        tr.appendChild(createCell(row.interestP2 || 0));
+        tr.appendChild(createCell(row.insurance));
+        tr.appendChild(createCell(row.totalPaid));
+        tr.appendChild(createCell(row.remainingCapitalP1 || row.remainingCapital));
+        tr.appendChild(createCell(row.remainingCapitalP2 || 0));
 
-      // Interest
-      const tdInterest = document.createElement('td');
-      tdInterest.textContent = formatCurrency(row.interestPart);
-      tr.appendChild(tdInterest);
+      } else {
+        // Standard Row
+        // Month
+        const tdMonth = document.createElement('td');
+        tdMonth.textContent = view === 'yearly' ? `Année ${row.year}` : row.month || (i + 1);
+        tr.appendChild(tdMonth);
 
-      // Insurance
-      const tdInsurance = document.createElement('td');
-      tdInsurance.textContent = formatCurrency(row.insurance);
-      tr.appendChild(tdInsurance);
+        // Year
+        if (view === 'monthly') {
+          const tdYear = document.createElement('td');
+          tdYear.textContent = row.year || Math.ceil((i + 1) / 12);
+          tr.appendChild(tdYear);
+        }
 
-      // Total paid
-      const tdTotalPaid = document.createElement('td');
-      tdTotalPaid.textContent = formatCurrency(row.totalPaid);
-      tr.appendChild(tdTotalPaid);
+        // Payment
+        const tdPayment = document.createElement('td');
+        tdPayment.textContent = formatCurrency(row.payment);
+        tr.appendChild(tdPayment);
 
-      // Remaining capital
-      const tdRemaining = document.createElement('td');
-      tdRemaining.textContent = formatCurrency(row.remainingCapital);
-      tr.appendChild(tdRemaining);
+        // Principal
+        const tdPrincipal = document.createElement('td');
+        tdPrincipal.textContent = formatCurrency(row.principalPart);
+        tr.appendChild(tdPrincipal);
+
+        // Interest
+        const tdInterest = document.createElement('td');
+        tdInterest.textContent = formatCurrency(row.interestPart);
+        tr.appendChild(tdInterest);
+
+        // Insurance
+        const tdInsurance = document.createElement('td');
+        tdInsurance.textContent = formatCurrency(row.insurance);
+        tr.appendChild(tdInsurance);
+
+        // Total paid
+        const tdTotalPaid = document.createElement('td');
+        tdTotalPaid.textContent = formatCurrency(row.totalPaid);
+        tr.appendChild(tdTotalPaid);
+
+        // Remaining capital
+        const tdRemaining = document.createElement('td');
+        tdRemaining.textContent = formatCurrency(row.remainingCapital);
+        tr.appendChild(tdRemaining);
+      }
 
       tbody.appendChild(tr);
     }
@@ -610,23 +743,47 @@ const UI = (() => {
       return;
     }
 
+    const isGigogne = data[0].paymentP2 !== undefined;
+
     // CSV header
-    const header = 'Mois,Année,Mensualité,Capital,Intérêts,Assurance,Total Payé,Capital Restant\n';
+    let header;
+    if (isGigogne) {
+      header = 'Mois,Année,Mensualité,Capital P1,Intérêts P1,Capital P2,Intérêts P2,Assurance,Total Payé,Restant P1,Restant P2\n';
+    } else {
+      header = 'Mois,Année,Mensualité,Capital,Intérêts,Assurance,Total Payé,Capital Restant\n';
+    }
     
     // CSV rows
     const rows = data.map((row, index) => {
       const month = row.month || (index + 1);
       const year = row.year || Math.ceil((index + 1) / 12);
-      return [
-        month,
-        year,
-        row.payment || 0,
-        row.principalPart || 0,
-        row.interestPart || 0,
-        row.insurance || 0,
-        row.totalPaid || 0,
-        row.remainingCapital || 0,
-      ].join(',');
+      
+      if (isGigogne) {
+        return [
+          month,
+          year,
+          row.payment || 0,
+          row.principalP1 || 0,
+          row.interestP1 || 0,
+          row.principalP2 || 0,
+          row.interestP2 || 0,
+          row.insurance || 0,
+          row.totalPaid || 0,
+          row.remainingCapitalP1 || 0,
+          row.remainingCapitalP2 || 0,
+        ].join(',');
+      } else {
+        return [
+          month,
+          year,
+          row.payment || 0,
+          row.principalPart || 0,
+          row.interestPart || 0,
+          row.insurance || 0,
+          row.totalPaid || 0,
+          row.remainingCapital || 0,
+        ].join(',');
+      }
     }).join('\n');
 
     const csv = header + rows;
@@ -749,6 +906,11 @@ const UI = (() => {
     showValidation,
     enableElement,
     disableElement,
+
+    // Gigogne
+    renderGigogneFields,
+    updatePrimaryRateDisplay,
+    updateGigogneInfo,
   };
 })();
 

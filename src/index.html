@@ -97,6 +97,12 @@
               </div>
 
               <div class="mb-3">
+                <label for="primary-rate" class="form-label">Taux appliqué</label>
+                <input type="number" class="form-control" id="primary-rate" step="0.01" min="0" max="10">
+                <small class="text-muted">Taux interpolé selon la durée. Modifiable.</small>
+              </div>
+
+              <div class="mb-3">
                 <label class="form-label">Taux d'intérêt par durée</label>
                 <div class="table-responsive">
                   <table class="table table-sm table-bordered">
@@ -129,6 +135,43 @@
                   </table>
                 </div>
                 <small class="text-muted">Les durées intermédiaires utilisent l'interpolation linéaire</small>
+              </div>
+            </section>
+
+            <hr>
+
+            <!-- Section: Gigogne -->
+            <section class="mb-4">
+              <h5 class="mb-3">🪆 Prêt Gigogne (Optionnel)</h5>
+              
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="gigogne-enabled">
+                <label class="form-check-label" for="gigogne-enabled">
+                  Activer le prêt gigogne
+                </label>
+              </div>
+              
+              <div id="gigogne-fields" class="d-none">
+                <div class="mb-3">
+                  <label for="gigogne-max-amount" class="form-label">Montant maximum (€)</label>
+                  <input type="number" class="form-control" id="gigogne-max-amount" value="50000" min="0" step="1000">
+                </div>
+                
+                <div class="mb-3">
+                  <label for="gigogne-duration" class="form-label">
+                    Durée: <span id="gigogne-duration-value">10</span> ans
+                  </label>
+                  <input type="range" class="form-range" id="gigogne-duration" min="5" max="15" value="10" step="1">
+                </div>
+                
+                <div class="mb-3">
+                  <label for="gigogne-rate" class="form-label">Taux du prêt secondaire (%)</label>
+                  <input type="number" class="form-control" id="gigogne-rate" value="0" step="0.01" min="0" max="10">
+                </div>
+                
+                <div class="alert alert-info small">
+                  <strong>ℹ️ Montant optimal calculé:</strong> <span id="gigogne-optimal-amount">—</span>
+                </div>
               </div>
             </section>
 

@@ -730,15 +730,321 @@ MortgageSimulator.Formulas = (() => {
       
       // Sanity check: reasonable range
       if (optimizedTAEG < 0 || optimizedTAEG > 50) {
-        // Fallback to iterative method
-        const totalCost = monthlyPayment * durationYears * 12;
-        return calcTAEG(loan, totalCost, durationYears);
+        console.error('TAEG optimization failed:', error);
+        return 0
       }
       
       return optimizedTAEG;
     } catch (error) {
       console.error('TAEG optimization failed:', error);
+      return 0;
     }
+  };
+
+  // ============================================
+  // 11. GIGOGNE (LAYERED LOAN) CALCULATIONS
+  // ============================================
+
+  /**
+   * Calculate smooth monthly payment for gigogne loan
+   * Uses lissage formula: M = (P1 + m2 * A(r1, n2)) / A(r1, n1)
+   * @param {number} p1 - Primary loan principal
+   * @param {number} r1 - Primary loan annual rate (%)
+   * @param {number} n1 - Primary loan duration (years)
+   * @param {number} p2 - Secondary loan principal
+   * @param {number} r2 - Secondary loan annual rate (%)
+   * @param {number} n2 - Secondary loan duration (years)
+   * @returns {number} Smooth monthly payment
+   */
+  const calcSmoothMensuality = (p1, r1, n1, p2, r2, n2) => {
+    if (p1 < 0 || p2 < 0 || !n1 || !n2) return 0;
+    
+    const rm1 = r1 / 12 / 100;
+    const rm2 = r2 / 12 / 100;
+    const nm1 = n1 * 12;
+    const nm2 = n2 * 12;
+
+    // Calculate m2 (secondary loan payment)
+    let m2;
+    if (rm2 === 0) {
+      m2 = p2 / nm2;
+    } else {
+      m2 = p2 * (rm2 * Math.pow(1 + rm2, nm2)) / (Math.pow(1 + rm2, nm2) - 1);
+    }
+
+    // Calculate Annuity Factors for Primary Rate
+    // A(r, n) = (1 - (1+r)^-n) / r
+    const calcAnnuityFactor = (r, n) => {
+      if (r === 0) return n;
+      return (1 - Math.pow(1 + r, -n)) / r;
+    };
+
+    const A_r1_n1 = calcAnnuityFactor(rm1, nm1);
+    const A_r1_n2 = calcAnnuityFactor(rm1, nm2);
+
+    // Calculate Smooth Payment M
+    // M = (P1 + m2 * A(r1, n2)) / A(r1, n1)
+    const M = (p1 + m2 * A_r1_n2) / A_r1_n1;
+
+    return M;
+  };
+
+  /**
+   * Calculate optimal secondary amount
+   * Maximizes P2 subject to constraints (MaxAmount, TotalLoan, Non-negative amortization)
+   * @param {number} totalLoan - Total loan amount required
+   * @param {number} r1 - Primary rate (%)
+   * @param {number} n1 - Primary duration (years)
+   * @param {number} r2 - Secondary rate (%)
+   * @param {number} n2 - Secondary duration (years)
+   * @param {number} maxAmount - User defined max amount for secondary
+   * @returns {number} Optimal secondary amount
+   */
+  const calcOptimalSecondaryAmount = (totalLoan, r1, n1, r2, n2, maxAmount) => {
+    if (!totalLoan || totalLoan <= 0) return 0;
+
+    // Constraint 1: P2 <= MaxAmount
+    // Constraint 2: P2 <= TotalLoan
+    const absoluteMaxP2 = Math.min(maxAmount, totalLoan);
+    
+    // If P2 is 0, it's valid (standard loan)
+    // We want to find max P2 in [0, absoluteMaxP2] such that no negative amortization
+    // Negative amortization check: (M - m2) >= P1 * r1_monthly
+    
+    const rm1 = r1 / 12 / 100;
+    
+    const checkConstraints = (p2) => {
+      const p1 = totalLoan - p2;
+      const M = calcSmoothMensuality(p1, r1, n1, p2, r2, n2);
+      
+      // Calculate m2
+      const rm2 = r2 / 12 / 100;
+      const nm2 = n2 * 12;
+      let m2;
+      if (rm2 === 0) {
+        m2 = p2 / nm2;
+      } else {
+        m2 = p2 * (rm2 * Math.pow(1 + rm2, nm2)) / (Math.pow(1 + rm2, nm2) - 1);
+      }
+      
+      const primaryPaymentPhase1 = M - m2;
+      const primaryInterest = p1 * rm1;
+      
+      // Allow a tiny tolerance for floating point issues
+      return primaryPaymentPhase1 >= (primaryInterest - 0.01);
+    };
+
+    // Binary search for max valid P2
+    let low = 0;
+    let high = absoluteMaxP2;
+    let optimal = 0;
+    
+    // Check if max is valid first (optimization)
+    if (checkConstraints(high)) {
+      return high;
+    }
+
+    // Binary search
+    for (let i = 0; i < 20; i++) {
+      const mid = (low + high) / 2;
+      if (checkConstraints(mid)) {
+        optimal = mid;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    return Math.floor(optimal);
+  };
+
+  /**
+   * Generate amortization table for gigogne loan
+   * @param {Object} params - { p1, r1, n1, p2, r2, n2, insuranceRate }
+   * @returns {Array} Amortization table
+   */
+  const generateGigogneAmortizationTable = (params) => {
+    const { p1, r1, n1, p2, r2, n2, insuranceRate } = params;
+    
+    const M = calcSmoothMensuality(p1, r1, n1, p2, r2, n2);
+    
+    const rm1 = r1 / 12 / 100;
+    const rm2 = r2 / 12 / 100;
+    const nm1 = n1 * 12;
+    const nm2 = n2 * 12;
+    
+    // Calculate m2
+    let m2;
+    if (rm2 === 0) {
+      m2 = p2 / nm2;
+    } else {
+      m2 = p2 * (rm2 * Math.pow(1 + rm2, nm2)) / (Math.pow(1 + rm2, nm2) - 1);
+    }
+
+    const table = [];
+    let remP1 = p1;
+    let remP2 = p2;
+    let totalPaid = 0;
+    
+    // Monthly insurance (calculated on initial capitals)
+    const ins1 = calcMonthlyInsurance(p1, insuranceRate);
+    const ins2 = calcMonthlyInsurance(p2, insuranceRate);
+    const totalIns = ins1 + ins2;
+
+    for (let month = 1; month <= nm1; month++) {
+      let pay1, pay2, int1, int2, princ1, princ2;
+      
+      // Phase 1: Both loans
+      if (month <= nm2) {
+        pay2 = m2;
+        int2 = remP2 * rm2;
+        princ2 = pay2 - int2;
+        
+        pay1 = M - m2;
+        int1 = remP1 * rm1;
+        princ1 = pay1 - int1;
+      } 
+      // Phase 2: Only primary
+      else {
+        pay2 = 0;
+        int2 = 0;
+        princ2 = 0;
+        
+        pay1 = M;
+        int1 = remP1 * rm1;
+        princ1 = pay1 - int1;
+      }
+      
+      // Update remaining capitals
+      remP1 -= princ1;
+      remP2 -= princ2;
+      
+      // Handle rounding/end of loan
+      if (month === nm2) remP2 = 0;
+      if (month === nm1) remP1 = 0;
+      if (remP1 < 0) remP1 = 0;
+      if (remP2 < 0) remP2 = 0;
+
+      totalPaid += pay1 + pay2 + totalIns;
+
+      table.push({
+        month,
+        year: Math.ceil(month / 12),
+        payment: pay1 + pay2,
+        paymentP1: pay1,
+        paymentP2: pay2,
+        principalP1: princ1,
+        interestP1: int1,
+        principalP2: princ2,
+        interestP2: int2,
+        insurance: totalIns,
+        totalPaid,
+        remainingCapitalP1: remP1,
+        remainingCapitalP2: remP2,
+        remainingCapital: remP1 + remP2
+      });
+    }
+    
+    return table;
+  };
+
+  /**
+   * Calculate Max Loan Amount with Gigogne
+   * @param {number} monthlyPayment - Max monthly payment
+   * @param {number} r1 - Primary rate
+   * @param {number} n1 - Primary duration
+   * @param {number} r2 - Secondary rate
+   * @param {number} n2 - Secondary duration
+   * @param {number} maxP2 - Max secondary amount
+   * @returns {Object} { totalLoan, p1, p2 }
+   */
+  const calcMaxLoanWithGigogne = (monthlyPayment, r1, n1, r2, n2, maxP2) => {
+    // We want to find P1, P2 such that SmoothPayment(P1, P2) = monthlyPayment
+    // And P2 is maximized (up to maxP2)
+    // M = (P1 + m2 * A(r1, n2)) / A(r1, n1)
+    // m2 = P2 / A(r2, n2)
+    // M * A(r1, n1) = P1 + P2 * (A(r1, n2) / A(r2, n2))
+    // P1 = M * A(r1, n1) - P2 * (A(r1, n2) / A(r2, n2))
+    
+    const rm1 = r1 / 12 / 100;
+    const rm2 = r2 / 12 / 100;
+    const nm1 = n1 * 12;
+    const nm2 = n2 * 12;
+    
+    const calcAnnuityFactor = (r, n) => (r === 0) ? n : (1 - Math.pow(1 + r, -n)) / r;
+    
+    const A1_n1 = calcAnnuityFactor(rm1, nm1);
+    const A1_n2 = calcAnnuityFactor(rm1, nm2);
+    const A2_n2 = calcAnnuityFactor(rm2, nm2);
+    
+    // Ratio of payments
+    const ratio = A1_n2 / A2_n2;
+    
+    // Max possible P1 + P2 * ratio = M * A1_n1
+    const capacityConstant = monthlyPayment * A1_n1;
+    
+    // We want to maximize P2.
+    // P1 = capacityConstant - P2 * ratio
+    // Total = P1 + P2 = capacityConstant + P2 * (1 - ratio)
+    // Since usually r2 < r1, A2_n2 > A1_n2 (for same n2? No, A decreases with r).
+    // Wait. A(r) = (1 - (1+r)^-n)/r.
+    // If r=0, A=n. If r>0, A<n.
+    // So lower rate -> higher A.
+    // So if r2 < r1, A2_n2 > A1_n2.
+    // So ratio = A1_n2 / A2_n2 < 1.
+    // So (1 - ratio) > 0.
+    // So Total increases as P2 increases.
+    // So we should maximize P2.
+    
+    let p2 = maxP2;
+    let p1 = capacityConstant - p2 * ratio;
+    
+    // Check if P1 is valid (must be > 0, and satisfy negative amortization)
+    // Neg Amort: M - m2 >= P1 * rm1
+    // M - P2/A2_n2 >= P1 * rm1
+    
+    // If P1 < 0, reduce P2
+    if (p1 < 0) {
+      // P1 = 0 -> P2 * ratio = capacityConstant
+      p2 = capacityConstant / ratio;
+      p1 = 0;
+    }
+    
+    // Check negative amortization
+    // This is harder to solve analytically, use binary search if needed.
+    // Or just check and reduce P2.
+    
+    const checkNegAmort = (valP2) => {
+      const valP1 = capacityConstant - valP2 * ratio;
+      const m2 = valP2 / A2_n2;
+      const primaryPay = monthlyPayment - m2;
+      const primaryInt = valP1 * rm1;
+      return primaryPay >= (primaryInt - 0.01);
+    };
+    
+    if (!checkNegAmort(p2)) {
+      // Binary search for max valid P2
+      let low = 0;
+      let high = p2;
+      let optimal = 0;
+      for(let i=0; i<20; i++) {
+        const mid = (low + high) / 2;
+        if (checkNegAmort(mid)) {
+          optimal = mid;
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+      p2 = optimal;
+      p1 = capacityConstant - p2 * ratio;
+    }
+    
+    return {
+      totalLoan: p1 + p2,
+      p1: p1,
+      p2: p2
+    };
   };
 
   // ============================================
@@ -774,6 +1080,12 @@ MortgageSimulator.Formulas = (() => {
     // Amortization & TAEG
     generateAmortizationTable,
     calcTAEG,
+
+    // Gigogne
+    calcSmoothMensuality,
+    calcOptimalSecondaryAmount,
+    generateGigogneAmortizationTable,
+    calcMaxLoanWithGigogne
   };
 })();
 
