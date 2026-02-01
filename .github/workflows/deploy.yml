@@ -23,10 +23,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm install -g inliner
+
+      - name: Debug - Check inliner version
+        run: |
+          inliner --version || echo "inliner not found"
+          inliner --help || echo "help failed"
 
       - name: Create dist directory
         run: mkdir -p dist
