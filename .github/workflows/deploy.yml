@@ -26,13 +26,13 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install -g inliner
 
       - name: Create dist directory
         run: mkdir -p dist
 
       - name: Inline CSS and images
-        run: npx inliner -ni src/index.html > dist/index.html
+        run: inliner -ni src/index.html > dist/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
