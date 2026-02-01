@@ -4,6 +4,9 @@
  * Coordinates State updates, formula calculations, and UI rendering
  */
 
+// Use global Config object (set by config.js)
+var { ItemDefaults } = window.Config || {};
+
 const Events = (() => {
   
   // ============================================
@@ -165,9 +168,9 @@ const Events = (() => {
    */
   const handleAddRevenue = () => {
     const newRevenue = MortgageSimulator.addRevenue({
-      type: 'Salaire',
-      amount: 0,
-      frequency: 'monthly',
+      type: ItemDefaults.revenue.type,
+      amount: ItemDefaults.revenue.amount,
+      frequency: ItemDefaults.revenue.frequency,
     });
     UI.addRevenueRow(newRevenue);
     debouncedRecalculate();
@@ -178,9 +181,9 @@ const Events = (() => {
    */
   const handleAddCharge = () => {
     const newCharge = MortgageSimulator.addCharge({
-      type: 'Loyer',
-      amount: 0,
-      frequency: 'monthly',
+      type: ItemDefaults.charge.type,
+      amount: ItemDefaults.charge.amount,
+      frequency: ItemDefaults.charge.frequency,
     });
     UI.addChargeRow(newCharge);
     debouncedRecalculate();

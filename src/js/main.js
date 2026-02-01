@@ -4,6 +4,9 @@
  * Coordinates all modules: State, Formulas, UI, Charts, Events
  */
 
+// Use global Config object (set by config.js)
+var { AppDefaults, ItemDefaults } = window.Config || {};
+
 // Extend the MortgageSimulator namespace with other modules
 MortgageSimulator.Formulas = MortgageSimulator.Formulas || {};
 MortgageSimulator.UI = UI;
@@ -23,37 +26,32 @@ MortgageSimulator.Events = Events;
    */
   const initDefaultState = () => {
     try {
-      // Set default duration: 20 years
-      MortgageSimulator.setDuration(20);
+      // Set default duration
+      MortgageSimulator.setDuration(AppDefaults.duration);
       
-      // Set default property type: 'old'
-      MortgageSimulator.setPropertyType('old');
+      // Set default property type
+      MortgageSimulator.setPropertyType(AppDefaults.propertyType);
       
-      // Set default property price: 250000€ (middle of range)
-      MortgageSimulator.setPropertyPrice(250000);
+      // Set default property price
+      MortgageSimulator.setPropertyPrice(AppDefaults.propertyPrice);
       
-      // Set default available capital: 50000€
-      MortgageSimulator.setCapital(50000);
+      // Set default available capital
+      MortgageSimulator.setCapital(AppDefaults.capital);
       
-      // Set default frais dossier: 1000€
-      MortgageSimulator.setFraisDossier(1000);
+      // Set default frais dossier
+      MortgageSimulator.setFraisDossier(AppDefaults.fraisDossier);
       
-      // Set default age for person 1: 30 years
-      MortgageSimulator.setAges({ person1: 30 });
+      // Set default ages
+      MortgageSimulator.setAges({ ...AppDefaults.ages });
       
-      // Add one empty revenue row (Salary Person 1)
-      const revenue = MortgageSimulator.addRevenue({
-        type: 'Salaire',
-        amount: 2800,
-        frequency: 'monthly'
-      });
+      // Note: Default revenue is already added in state.js defaultState
       
       // Optionally add one empty charge row
       // Commented out as per requirements (optional)
       // const charge = MortgageSimulator.addCharge({
-      //   type: 'Loyer',
-      //   amount: 0,
-      //   frequency: 'monthly'
+      //   type: ItemDefaults.charge.type,
+      //   amount: ItemDefaults.charge.amount,
+      //   frequency: ItemDefaults.charge.frequency
       // });
       
       console.log('✓ Default state initialized');

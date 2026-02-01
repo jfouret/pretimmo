@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏠 Simulateur de Prêt Immobilier</title>
+  <!-- Bootstrap 5.x CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <!-- CSS injected by Makefile -->
+</head>
+<body>
+  <!-- Header -->
+  <header class="bg-primary text-white py-3 shadow-sm">
+    <div class="container-fluid">
+      <h1 class="h3 mb-0">🏠 Simulateur de Prêt Immobilier</h1>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <div class="container-fluid py-4">
+    <div class="row g-4">
+      
+      <!-- LEFT PANEL - INPUTS -->
+      <div class="col-lg-4 col-md-12">
+        <div class="card shadow-sm h-100">
+          <div class="card-body" style="max-height: calc(100vh - 150px); overflow-y: auto;">
+            
+            <!-- Section: Revenus -->
+            <section class="mb-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">💰 Revenus</h5>
+                <button type="button" class="btn btn-sm btn-success" id="add-revenue-btn">
+                  <span>+</span> Ajouter
+                </button>
+              </div>
+              <div id="revenue-rows" class="mb-2">
+                <!-- Dynamic revenue rows will be inserted here -->
+              </div>
+            </section>
+
+            <hr>
+
+            <!-- Section: Charges -->
+            <section class="mb-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">💳 Charges</h5>
+                <button type="button" class="btn btn-sm btn-success" id="add-charge-btn">
+                  <span>+</span> Ajouter
+                </button>
+              </div>
+              <div id="charge-rows" class="mb-2">
+                <!-- Dynamic charge rows will be inserted here -->
+              </div>
+            </section>
+
+            <hr>
+
+            <!-- Section: Personal Info -->
+            <section class="mb-4">
+              <h5 class="mb-3">👤 Informations Personnelles</h5>
+              
+              <div class="mb-3">
+                <label for="age-person1" class="form-label">Âge en année (pour assurance)</label>
+                <input type="number" class="form-control" id="age-person1" placeholder="18-75">
+              </div>
+
+            </section>
+
+            <hr>
+
+            <!-- Section: Capital & Fees -->
+            <section class="mb-4">
+              <h5 class="mb-3">💵 Capital & Frais</h5>
+              
+              <div class="mb-3">
+                <label for="available-capital" class="form-label">Apport personnel (€)</label>
+                <input type="number" class="form-control" id="available-capital" min="0" step="1000" placeholder="Ex: 50000">
+              </div>
+
+              <div class="mb-3">
+                <label for="frais-dossier" class="form-label">Frais de dossier (€)</label>
+                <input type="number" class="form-control" id="frais-dossier" value="1000" min="0" step="100">
+              </div>
+            </section>
+
+            <hr>
+
+            <!-- Section: Loan Parameters -->
+            <section class="mb-4">
+              <h5 class="mb-3">📊 Paramètres du Prêt</h5>
+              
+              <div class="mb-3">
+                <label for="loan-duration" class="form-label">
+                  Durée du prêt: <span id="duration-value">20</span> ans
+                </label>
+                <input type="range" class="form-range" id="loan-duration" min="15" max="25" value="20" step="1">
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Taux d'intérêt par durée</label>
+                <div class="table-responsive">
+                  <table class="table table-sm table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Durée</th>
+                        <th>Taux (%)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>15 ans</td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm rate-input" id="rate-15" value="3.09" step="0.01" min="0" max="10">
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>20 ans</td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm rate-input" id="rate-20" value="3.17" step="0.01" min="0" max="10">
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>25 ans</td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm rate-input" id="rate-25" value="3.25" step="0.01" min="0" max="10">
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <small class="text-muted">Les durées intermédiaires utilisent l'interpolation linéaire</small>
+              </div>
+            </section>
+
+            <hr>
+
+            <!-- Section: Property -->
+            <section class="mb-4">
+              <h5 class="mb-3">🏡 Bien Immobilier</h5>
+              
+              <div class="mb-3">
+                <label class="form-label">Type de bien</label>
+                <div class="btn-group w-100" role="group" id="property-type-toggle">
+                  <input type="radio" class="btn-check" name="property-type" id="property-old" value="old" checked>
+                  <label class="btn btn-outline-primary" for="property-old">Ancien</label>
+                  
+                  <input type="radio" class="btn-check" name="property-type" id="property-new" value="new">
+                  <label class="btn btn-outline-primary" for="property-new">Neuf (VEFA)</label>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="property-price-slider" class="form-label">
+                  Prix du bien: <span id="property-price-display">200000</span> €
+                </label>
+                <input type="range" class="form-range" id="property-price-slider" min="50000" max="500000" value="200000" step="5000">
+              </div>
+
+              <div class="mb-3">
+                <label for="property-price-input" class="form-label">Prix du bien (€)</label>
+                <input type="number" class="form-control" id="property-price-input" min="50000" max="500000" value="200000" step="5000">
+              </div>
+
+              <div class="alert alert-info small mb-0">
+                <strong>ℹ️ Info:</strong> Le prix maximum est calculé dynamiquement en fonction de votre capacité d'emprunt.
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL - RESULTS -->
+      <div class="col-lg-8 col-md-12">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-white">
+            <!-- Tab Navigation -->
+            <ul class="nav nav-tabs card-header-tabs" id="results-tabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-summary" data-bs-toggle="tab" data-bs-target="#content-summary" type="button" role="tab">
+                  📌 Résumé
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-donut" data-bs-toggle="tab" data-bs-target="#content-donut" type="button" role="tab">
+                  🥧 Répartition
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-area" data-bs-toggle="tab" data-bs-target="#content-area" type="button" role="tab">
+                  📈 Évolution
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-line" data-bs-toggle="tab" data-bs-target="#content-line" type="button" role="tab">
+                  📉 Capital Restant
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-table" data-bs-toggle="tab" data-bs-target="#content-table" type="button" role="tab">
+                  📋 Tableau
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card-body" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+            <!-- Tab Content -->
+            <div class="tab-content" id="results-tab-content">
+              
+              <!-- Tab 1: Summary -->
+              <div class="tab-pane fade show active" id="content-summary" role="tabpanel">
+                <h5 class="mb-4">Résumé de votre capacité d'emprunt</h5>
+                <div class="row g-3" id="summary-cards">
+                  <!-- Summary cards will be generated by JavaScript -->
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-primary">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Budget maximum</h6>
+                        <p class="card-text h4 mb-0" id="summary-max-budget">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-secondary">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Prix du bien</h6>
+                        <p class="card-text h4 mb-0" id="summary-property-price">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-info">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Montant emprunté</h6>
+                        <p class="card-text h4 mb-0" id="summary-loan-amount">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-success">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Mensualité (hors assurance)</h6>
+                        <p class="card-text h4 mb-0" id="summary-monthly-payment">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-warning">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Mensualité (avec assurance)</h6>
+                        <p class="card-text h4 mb-0" id="summary-monthly-with-insurance">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-danger">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Coût total du crédit</h6>
+                        <p class="card-text h4 mb-0" id="summary-total-cost">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-secondary">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Frais de notaire</h6>
+                        <p class="card-text h4 mb-0" id="summary-notary-fees">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="card border-secondary">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Frais de cautionnement</h6>
+                        <p class="card-text h4 mb-0" id="summary-caution-fees">—</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-12">
+                    <div class="card">
+                      <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Taux d'endettement</h6>
+                        <div class="progress" style="height: 30px;">
+                          <div class="progress-bar" role="progressbar" id="debt-ratio-bar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                            <span id="debt-ratio-text">0%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Formula Display Section -->
+                <div class="mt-4">
+                  <div class="card border-info">
+                    <div class="card-body">
+                      <h6 class="card-subtitle mb-3 text-muted">📐 Formule de calcul du capital à emprunter</h6>
+                      <div class="mb-2">
+                        <span class="text-muted fst-italic">Capital à emprunter =</span> 
+                        <span>Prix + Frais de notaire + Frais de dossier + Frais de cautionnement - Apport personnel</span>
+                      </div>
+                      <div id="formula-calculation" class="mt-2 p-2 bg-light rounded">
+                        <span class="fw-bold">Capital =</span> <span id="formula-value">—</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab 2: Donut Chart -->
+              <div class="tab-pane fade" id="content-donut" role="tabpanel">
+                <h5 class="mb-4">Répartition des coûts</h5>
+                <div class="d-flex justify-content-center">
+                  <div style="max-width: 500px; width: 100%;">
+                    <canvas id="chart-donut"></canvas>
+                  </div>
+                </div>
+                <div id="donut-legend" class="mt-4">
+                  <!-- Legend will be generated by JavaScript -->
+                </div>
+              </div>
+
+              <!-- Tab 3: Stacked Area Chart -->
+              <div class="tab-pane fade" id="content-area" role="tabpanel">
+                <h5 class="mb-4">Évolution des paiements mensuels</h5>
+                <div>
+                  <canvas id="chart-area"></canvas>
+                </div>
+              </div>
+
+              <!-- Tab 4: Line Chart -->
+              <div class="tab-pane fade" id="content-line" role="tabpanel">
+                <h5 class="mb-4">Capital restant dû</h5>
+                <div>
+                  <canvas id="chart-line"></canvas>
+                </div>
+              </div>
+
+              <!-- Tab 5: Amortization Table -->
+              <div class="tab-pane fade" id="content-table" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h5 class="mb-0">Tableau d'amortissement</h5>
+                  <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="toggle-view-btn">
+                      📅 Vue par année
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success" id="export-csv-btn">
+                      📥 Exporter CSV
+                    </button>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-striped table-hover table-sm" id="amortization-table">
+                    <thead class="table-dark sticky-top">
+                      <tr>
+                        <th>Mois</th>
+                        <th>Année</th>
+                        <th>Mensualité</th>
+                        <th>Capital</th>
+                        <th>Intérêts</th>
+                        <th>Assurance</th>
+                        <th>Total payé</th>
+                        <th>Capital restant</th>
+                      </tr>
+                    </thead>
+                    <tbody id="amortization-table-body">
+                      <!-- Table rows will be generated by JavaScript -->
+                      <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                          Remplissez les informations pour générer le tableau
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bootstrap 5.x JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Application JS (for direct testing - normally injected by Makefile) -->
+  <script src="js/config.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/formulas.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/main.js"></script>
+  <!-- Chart.js and application JS injected by Makefile -->
+</body>
+</html>

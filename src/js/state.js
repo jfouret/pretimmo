@@ -4,6 +4,9 @@
  * Uses IIFE pattern for encapsulation and provides a clean public API
  */
 
+// Use global Config object (set by config.js)
+var { AppDefaults, ItemDefaults } = window.Config || {};
+
 const MortgageSimulator = (() => {
   // Private ID counter for dynamic rows
   let idCounter = 1;
@@ -11,15 +14,15 @@ const MortgageSimulator = (() => {
   // Default state values
   const defaultState = {
     // User inputs
-    revenues: [{id: idCounter++, type: 'salary', amount: 2800, frequency: 'monthly'}],
+    revenues: [{id: idCounter++, type: ItemDefaults.revenue.type, amount: ItemDefaults.revenue.amount, frequency: ItemDefaults.revenue.frequency}],
     charges: [],
-    ages: { person1: 30 },
-    capital: 50000,        // Available capital / apport personnel
-    fraisDossier: 1000,// Default 1000€
-    rates: { 15: 3.09, 20: 3.17, 25: 3.25 }, // Interest rates by duration
-    duration: 20,      // Loan duration in years
-    propertyType: 'old', // 'old' or 'new'
-    propertyPrice: 0,  // Selected property price
+    ages: { ...AppDefaults.ages },
+    capital: AppDefaults.capital,
+    fraisDossier: AppDefaults.fraisDossier,
+    rates: { ...AppDefaults.rates },
+    duration: AppDefaults.duration,
+    propertyType: AppDefaults.propertyType,
+    propertyPrice: AppDefaults.propertyPrice,  // Fixed: now 250000
     
     // Computed values (cached)
     maxLoan: 0,
@@ -35,8 +38,8 @@ const MortgageSimulator = (() => {
     cautionFees: 0,
     
     // UI state
-    activeTab: 'summary',
-    tableView: 'monthly', // 'monthly' or 'yearly'
+    activeTab: AppDefaults.activeTab,
+    tableView: AppDefaults.tableView,
   };
 
   // Application state (initialized from defaults)
@@ -436,15 +439,15 @@ const MortgageSimulator = (() => {
      */
     reset() {
       // Reset all properties to defaults
-      state.revenues = [];
+      state.revenues = [{ id: idCounter++, ...ItemDefaults.revenue }];
       state.charges = [];
-      state.ages = { person1: 30 };
-      state.capital = 0;
-      state.fraisDossier = 1000;
-      state.rates = { 15: 3.09, 20: 3.17, 25: 3.25 };
-      state.duration = 20;
-      state.propertyType = 'old';
-      state.propertyPrice = 0;
+      state.ages = { ...AppDefaults.ages };
+      state.capital = AppDefaults.capital;  // Fixed: was 0, now 50000
+      state.fraisDossier = AppDefaults.fraisDossier;
+      state.rates = { ...AppDefaults.rates };
+      state.duration = AppDefaults.duration;
+      state.propertyType = AppDefaults.propertyType;
+      state.propertyPrice = AppDefaults.propertyPrice;  // Fixed: now 250000
       
       // Reset computed values
       state.maxLoan = 0;
@@ -460,8 +463,8 @@ const MortgageSimulator = (() => {
       state.cautionFees = 0;
       
       // Reset UI state
-      state.activeTab = 'summary';
-      state.tableView = 'monthly';
+      state.activeTab = AppDefaults.activeTab;
+      state.tableView = AppDefaults.tableView;
       
       // Reset ID counter
       idCounter = 1;

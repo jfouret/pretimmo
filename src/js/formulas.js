@@ -4,6 +4,9 @@
  * Uses pure functions where possible for predictability and testability
  */
 
+// Use global Config object (set by config.js)
+var { FormulaConstants } = window.Config || {};
+
 // Extend the MortgageSimulator namespace
 MortgageSimulator.Formulas = (() => {
   
@@ -55,7 +58,7 @@ MortgageSimulator.Formulas = (() => {
    * @returns {number} Maximum monthly loan payment (excluding insurance)
    */
   const calcMaxMonthlyPayment = (income, charges) => {
-    const maxPayment = income * 0.35 - charges;
+    const maxPayment = income * FormulaConstants.debtRatio - charges;
     return Math.max(0, maxPayment); // Cannot be negative
   };
 
@@ -74,17 +77,19 @@ MortgageSimulator.Formulas = (() => {
       return 0;
     }
     
-    // Age brackets with midpoint rates
+    const rates = FormulaConstants.insuranceRates;
+    
+    // Age brackets with rates from config
     if (age <= 25) {
-      return 0.0012; // 0.12%
+      return rates.upTo25;
     } else if (age <= 40) {
-      return 0.00235; // 0.235%
+      return rates.upTo40;
     } else if (age <= 50) {
-      return 0.00385; // 0.385%
+      return rates.upTo50;
     } else if (age <= 65) {
-      return 0.0055; // 0.55%
+      return rates.upTo65;
     } else {
-      return 0.0065; // 0.65%
+      return rates.over65;
     }
   };
 
@@ -127,7 +132,7 @@ MortgageSimulator.Formulas = (() => {
     }
     
     // Determine which two points to interpolate between
-    let d1, d2;
+    var d1, d2;
     if (duration < 15) {
       return rates[15]; // Use minimum rate
     } else if (duration <= 20) {
@@ -217,27 +222,29 @@ MortgageSimulator.Formulas = (() => {
    * @returns {number} Émoluments including 20% TVA
    */
   const calcEmoluments = (price) => {
-    let emoluments = 0;
+    const rates = FormulaConstants.emolumentRates;
+    const thresholds = FormulaConstants.emolumentThresholds;
+    var emoluments = 0;
     
     // Sliding scale brackets
-    if (price > 60000) {
-      emoluments += (price - 60000) * 0.00799;
-      price = 60000;
+    if (price > thresholds.tier3) {
+      emoluments += (price - thresholds.tier3) * rates.bracket4;
+      price = thresholds.tier3;
     }
-    if (price > 17000) {
-      emoluments += (price - 17000) * 0.01064;
-      price = 17000;
+    if (price > thresholds.tier2) {
+      emoluments += (price - thresholds.tier2) * rates.bracket3;
+      price = thresholds.tier2;
     }
-    if (price > 6500) {
-      emoluments += (price - 6500) * 0.01596;
-      price = 6500;
+    if (price > thresholds.tier1) {
+      emoluments += (price - thresholds.tier1) * rates.bracket2;
+      price = thresholds.tier1;
     }
     if (price > 0) {
-      emoluments += price * 0.03870;
+      emoluments += price * rates.bracket1;
     }
     
     // Add 20% TVA
-    return emoluments * 1.20;
+    return emoluments * FormulaConstants.emolumentTVA;
   };
 
   /**
@@ -256,21 +263,23 @@ MortgageSimulator.Formulas = (() => {
     const emoluments = calcEmoluments(propertyPrice);
     
     // 2. Taxes (different for old vs new)
-    let taxes;
+    var taxes;
     if (propertyType === 'new') {
-      // New property: Taxe de publicité foncière ~0.715%
-      taxes = propertyPrice * 0.00715;
+      // New property: Taxe de publicité foncière
+      taxes = propertyPrice * FormulaConstants.propertyTax.new;
     } else {
-      // Old property: Droits de mutation ~5.80%
-      // (4.50% departmental + 1.20% municipal + 2.37% collection fee on departmental)
-      taxes = propertyPrice * 0.058;
+      // Old property: Droits de mutation
+      taxes = propertyPrice * FormulaConstants.propertyTax.old;
     }
     
     // 3. Débours (disbursements) - fixed estimate
-    const debours = 1000;
+    const debours = FormulaConstants.debours;
     
     // 4. Contribution Sécurité Immobilière (0.10% of price, min 15€)
-    const contribution = Math.max(15, propertyPrice * 0.001);
+    const contribution = Math.max(
+      FormulaConstants.contribution.minimum,
+      propertyPrice * FormulaConstants.contribution.rate
+    );
     
     const totalFees = emoluments + taxes + debours + contribution;
     
@@ -292,22 +301,25 @@ MortgageSimulator.Formulas = (() => {
       return 0;
     }
     
+    const cautionConfig = FormulaConstants.caution;
+    
     // 1. Commission (non-refundable)
-    let commission;
-    if (loanAmount <= 500000) {
-      commission = loanAmount * 0.012; // 1.20%
+    var commission;
+    if (loanAmount <= cautionConfig.threshold) {
+      commission = loanAmount * cautionConfig.commissionRateLow;
     } else {
-      commission = 6000 + (loanAmount - 500000) * 0.005; // 6000€ + 0.50% above 500k
+      commission = cautionConfig.commissionFixed + 
+                   (loanAmount - cautionConfig.threshold) * cautionConfig.commissionRateHigh;
     }
     
-    // 2. FMG (Fonds Mutuel de Garantie) - 0.50% of loan
+    // 2. FMG (Fonds Mutuel de Garantie)
     // Partially refundable at loan end, but counted in full for cost calculation
-    const fmg = loanAmount * 0.005; // 0.50%
+    const fmg = loanAmount * cautionConfig.fmgRate;
     
     const totalCaution = commission + fmg;
     
-    // Minimum total: 1000€
-    return Math.max(1000, totalCaution);
+    // Minimum total
+    return Math.max(cautionConfig.minimum, totalCaution);
   };
 
   // ============================================
@@ -329,15 +341,16 @@ MortgageSimulator.Formulas = (() => {
       return { price: 0, notaryFees: 0, caution: 0, totalFees: 0 };
     }
     
+    const iterConfig = FormulaConstants.iteration;
+    
     // Initial estimate: Price = Capital + MaxLoan
-    let estimatedPrice = capital + maxLoan;
-    let previousPrice = 0;
-    let iterations = 0;
-    const maxIterations = 10; // Safety limit
-    const convergenceThreshold = 100; // €100 tolerance
+    var estimatedPrice = capital + maxLoan;
+    var previousPrice = 0;
+    var iterations = 0;
     
     // Iterate until convergence
-    while (Math.abs(estimatedPrice - previousPrice) > convergenceThreshold && iterations < maxIterations) {
+    while (Math.abs(estimatedPrice - previousPrice) > iterConfig.convergenceThreshold && 
+           iterations < iterConfig.maxIterations) {
       previousPrice = estimatedPrice;
       
       // Calculate fees for current estimate
@@ -383,18 +396,19 @@ MortgageSimulator.Formulas = (() => {
       return { loan: 0, caution: 0, notaryFees: 0, totalFees: 0 };
     }
     
+    const iterConfig = FormulaConstants.iteration;
+    
     // Calculate notary fees (independent of loan)
     const notaryFees = calcNotaryFees(propertyPrice, propertyType);
     
-    // Initial loan estimate (assuming 10% for fees)
-    let estimatedLoan = propertyPrice + propertyPrice * 0.10 - capital;
-    let previousLoan = 0;
-    let iterations = 0;
-    const maxIterations = 10;
-    const convergenceThreshold = 100; // €100 tolerance
+    // Initial loan estimate (using initial fees estimate)
+    var estimatedLoan = propertyPrice + propertyPrice * iterConfig.initialFeesEstimate - capital;
+    var previousLoan = 0;
+    var iterations = 0;
     
     // Iterate until convergence
-    while (Math.abs(estimatedLoan - previousLoan) > convergenceThreshold && iterations < maxIterations) {
+    while (Math.abs(estimatedLoan - previousLoan) > iterConfig.convergenceThreshold && 
+           iterations < iterConfig.maxIterations) {
       previousLoan = estimatedLoan;
       
       // Calculate caution based on current loan estimate
@@ -449,10 +463,10 @@ MortgageSimulator.Formulas = (() => {
     const monthlyInsurance = calcMonthlyInsurance(loan, insuranceRate);
     
     const table = [];
-    let remainingCapital = loan;
-    let totalPaid = 0;
+    var remainingCapital = loan;
+    var totalPaid = 0;
     
-    for (let month = 1; month <= numMonths; month++) {
+    for (var month = 1; month <= numMonths; month++) {
       // Calculate interest on remaining capital
       const interestPart = remainingCapital * monthlyRate;
       
@@ -504,21 +518,20 @@ MortgageSimulator.Formulas = (() => {
       return 0;
     }
     
+    const taegConfig = FormulaConstants.taeg;
     const numMonths = durationYears * 12;
     const monthlyPayment = totalCost / numMonths;
     
     // Newton-Raphson method to find monthly rate
-    let rate = 0.003; // Initial guess ~3.6% annual
-    let iterations = 0;
-    const maxIterations = 100;
-    const tolerance = 0.000001;
+    var rate = taegConfig.initialGuess;
+    var iterations = 0;
     
-    while (iterations < maxIterations) {
+    while (iterations < taegConfig.maxIterations) {
       // Calculate present value at current rate
       const pv = monthlyPayment * (1 - Math.pow(1 + rate, -numMonths)) / rate;
       const diff = pv - loan;
       
-      if (Math.abs(diff) < tolerance) {
+      if (Math.abs(diff) < taegConfig.tolerance) {
         break;
       }
       
@@ -532,8 +545,8 @@ MortgageSimulator.Formulas = (() => {
       rate = rate - diff / dpv;
       
       // Prevent negative or extreme rates
-      if (rate < 0) rate = 0.0001;
-      if (rate > 0.1) rate = 0.1; // Cap at 10% monthly (unrealistic)
+      if (rate < taegConfig.minRate) rate = taegConfig.minRate;
+      if (rate > taegConfig.maxRate) rate = taegConfig.maxRate;
       
       iterations++;
     }

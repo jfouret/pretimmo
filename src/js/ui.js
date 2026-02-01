@@ -3,6 +3,9 @@
  * Handles all UI rendering and DOM updates for the Mortgage Dynamic Simulator
  */
 
+// Use global Config object (set by config.js)
+var { UIOptions } = window.Config || {};
+
 const UI = (() => {
   
   // ============================================
@@ -79,8 +82,8 @@ const UI = (() => {
     select.dataset.field = 'type';
     
     const types = rowType === 'revenue' 
-      ? ['Salaire', 'Prime', 'Revenus fonciers', 'Autre']
-      : ['Loyer', 'Crédit', 'Pension', 'Autre'];
+      ? UIOptions.revenueTypes
+      : UIOptions.chargeTypes;
     
     types.forEach(type => {
       const option = document.createElement('option');
